@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { MessageSquare, Package, RotateCcw, LayoutDashboard } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut } from "lucide-react";
 import { clsx } from "clsx";
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 
 const navItems = [
   { href: "/genel", label: "Genel Bakış", icon: LayoutDashboard },
@@ -14,6 +16,26 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [shopName, setShopName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUserEmail(user.email ?? null);
+        setShopName(user.user_metadata?.shop_name ?? null);
+      }
+    });
+  }, []);
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/giris");
+    router.refresh();
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -46,9 +68,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-200 space-y-1">
-          <p className="text-xs font-medium text-gray-700">Mira'nın Mağazası</p>
-          <p className="text-xs text-gray-400">Profesyonel Plan</p>
+        {/* Kullanıcı bilgisi + çıkış */}
+        <div className="p-4 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-gray-800 truncate">
+                {shopName ?? "Mağazam"}
+              </p>
+              <p className="text-xs text-gray-400 truncate">{userEmail ?? "—"}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Çıkış Yap"
+              className="ml-2 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </aside>
 
