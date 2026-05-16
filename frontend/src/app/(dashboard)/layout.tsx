@@ -38,9 +38,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
+    <div className="flex flex-col h-screen bg-gray-50 md:flex-row">
+
+      {/* ── Mobil üst bar ─────────────────────────────── */}
+      <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0">
+        <div>
+          <p className="font-bold text-gray-900 text-sm">SatıcıPilot</p>
+          <p className="text-xs text-gray-400">{shopName ?? "Mağazam"}</p>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="p-2 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
+      </header>
+
+      {/* ── Masaüstü sidebar ──────────────────────────── */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col flex-shrink-0">
         <div className="p-6 border-b border-gray-200">
           <h1 className="text-xl font-bold text-gray-900">SatıcıPilot</h1>
           <p className="text-xs text-gray-500 mt-1">AI Operasyon Asistanı</p>
@@ -68,13 +83,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        {/* Kullanıcı bilgisi + çıkış */}
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center justify-between">
             <div className="min-w-0">
-              <p className="text-xs font-medium text-gray-800 truncate">
-                {shopName ?? "Mağazam"}
-              </p>
+              <p className="text-xs font-medium text-gray-800 truncate">{shopName ?? "Mağazam"}</p>
               <p className="text-xs text-gray-400 truncate">{userEmail ?? "—"}</p>
             </div>
             <button
@@ -88,8 +100,31 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="flex-1 overflow-y-auto p-8">{children}</main>
+      {/* ── İçerik ───────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+        {children}
+      </main>
+
+      {/* ── Mobil alt nav bar ─────────────────────────── */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-10">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={clsx(
+                "flex-1 flex flex-col items-center justify-center py-2.5 gap-1 text-xs transition-colors",
+                active ? "text-orange-600" : "text-gray-400"
+              )}
+            >
+              <Icon className={clsx("w-5 h-5", active ? "text-orange-500" : "text-gray-400")} />
+              <span className="text-[10px]">{label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
     </div>
   );
 }
