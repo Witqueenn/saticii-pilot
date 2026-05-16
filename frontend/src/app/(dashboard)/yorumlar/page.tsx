@@ -1,51 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { AlertTriangle, CheckCircle, MessageSquare, Clock, Filter } from "lucide-react";
 import { clsx } from "clsx";
 
-const MOCK_REVIEWS = [
-  {
-    id: "1",
-    product_name: "Yazlık Keten Bluz - Beyaz",
-    rating: 2,
-    comment: "Beden çok küçük geldi, beden tablosuna bakıp L aldım ama M gibi. İade edeceğim.",
-    sentiment: "olumsuz",
-    is_urgent: true,
-    is_replied: false,
-    suggested_reply: "Merhaba, yaşadığınız beden sorununu özür dileriz. İade talebinizi hemen işleme alıyoruz. Bir sonraki alışverişinizde size özel %10 indirim sunacağız.",
-  },
-  {
-    id: "2",
-    product_name: "Çiçek Desenli Elbise - Pembe",
-    rating: 5,
-    comment: "Çok güzel bir ürün, tam beden. Hızlı kargo geldi, teşekkürler!",
-    sentiment: "olumlu",
-    is_urgent: false,
-    is_replied: true,
-    suggested_reply: null,
-  },
-  {
-    id: "3",
-    product_name: "Yazlık Keten Bluz - Beyaz",
-    rating: 1,
-    comment: "Ürün fotoğraftakiyle hiç benzemiyor, renk tamamen farklı. Çok hayal kırıklığı.",
-    sentiment: "acil",
-    is_urgent: true,
-    is_replied: false,
-    suggested_reply: "Merhaba, yaşadığınız hayal kırıklığı için çok özür dileriz. Ürün fotoğraflarımızı güncelliyoruz. Ücretsiz iade için hemen müşteri hizmetlerimizi arayabilirsiniz.",
-  },
-  {
-    id: "4",
-    product_name: "Çizgili Yazlık Elbise - Lacivert",
-    rating: 4,
-    comment: "Güzel ürün ama kargo biraz geç geldi.",
-    sentiment: "notr",
-    is_urgent: false,
-    is_replied: false,
-    suggested_reply: "Merhaba, geç kargo için özür dileriz. Kargonuzun gecikmesinden dolayı üzgünüz, bir sonraki siparişinizde öncelikli kargo sağlayacağız.",
-  },
-];
+interface Review {
+  id: string;
+  product_name: string;
+  rating: number;
+  comment: string;
+  customer_name: string | null;
+  sentiment: string | null;
+  is_urgent: boolean;
+  is_replied: boolean;
+  suggested_reply: string | null;
+  reviewed_at: string;
+}
 
 const sentimentLabel: Record<string, { label: string; color: string }> = {
   olumlu: { label: "Olumlu", color: "bg-green-100 text-green-700" },
@@ -54,39 +25,60 @@ const sentimentLabel: Record<string, { label: string; color: string }> = {
   acil: { label: "ACİL", color: "bg-red-600 text-white" },
 };
 
-type FilterType = "tumü" | "acil" | "bekleyen" | "cevaplandi";
+type FilterType = "tumu" | "acil" | "bekleyen" | "cevaplandi";
 
 const filters: { key: FilterType; label: string }[] = [
-  { key: "tumü", label: "Tümü" },
+  { key: "tumu", label: "Tümü" },
   { key: "acil", label: "Acil" },
   { key: "bekleyen", label: "Bekleyen" },
   { key: "cevaplandi", label: "Cevaplandı" },
 ];
 
 export default function YorumlarPage() {
-  const [activeFilter, setActiveFilter] = useState<FilterType>("tumü");
-  const [reviews, setReviews] = useState(MOCK_REVIEWS);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<FilterType>("tumu");
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("reviews")
+        .select("*")
+        .eq("seller_id", user.id)
+        .order("reviewed_at", { ascending: false });
+
+      setReviews(data ?? []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  async function markReplied(id: string) {
+    const supabase = createClient();
+    await supabase.from("reviews").update({ is_replied: true }).eq("id", id);
+    setReviews((prev) => prev.map((r) => r.id === id ? { ...r, is_replied: true } : r));
+  }
 
   const filtered = reviews.filter((r) => {
-    if (activeFilter === "acil") return r.is_urgent;
+    if (activeFilter === "acil") return r.is_urgent && !r.is_replied;
     if (activeFilter === "bekleyen") return !r.is_replied;
     if (activeFilter === "cevaplandi") return r.is_replied;
     return true;
   });
 
   const counts = {
-    tumü: reviews.length,
-    acil: reviews.filter((r) => r.is_urgent).length,
+    tumu: reviews.length,
+    acil: reviews.filter((r) => r.is_urgent && !r.is_replied).length,
     bekleyen: reviews.filter((r) => !r.is_replied).length,
     cevaplandi: reviews.filter((r) => r.is_replied).length,
   };
 
-  const markReplied = (id: string) =>
-    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, is_replied: true } : r)));
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Yorum Merkezi</h2>
@@ -104,7 +96,6 @@ export default function YorumlarPage() {
         </div>
       </div>
 
-      {/* Filtre tabları */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
         {filters.map(({ key, label }) => (
           <button
@@ -112,9 +103,7 @@ export default function YorumlarPage() {
             onClick={() => setActiveFilter(key)}
             className={clsx(
               "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
-              activeFilter === key
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+              activeFilter === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
             )}
           >
             {label}
@@ -128,8 +117,11 @@ export default function YorumlarPage() {
         ))}
       </div>
 
-      {/* Yorum listesi */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+          Yükleniyor...
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <Filter className="w-8 h-8 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">Bu filtrede yorum yok.</p>
@@ -147,9 +139,14 @@ export default function YorumlarPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="font-medium text-gray-900">{r.product_name}</p>
+                  {r.customer_name && (
+                    <p className="text-xs text-gray-400 mt-0.5">{r.customer_name}</p>
+                  )}
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className="text-yellow-400 text-sm">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
-                    {r.sentiment && (
+                    <span className="text-yellow-400 text-sm">
+                      {"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}
+                    </span>
+                    {r.sentiment && sentimentLabel[r.sentiment] && (
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sentimentLabel[r.sentiment].color}`}>
                         {sentimentLabel[r.sentiment].label}
                       </span>
@@ -161,6 +158,9 @@ export default function YorumlarPage() {
                     )}
                   </div>
                 </div>
+                <span className="text-xs text-gray-400 flex-shrink-0 ml-2">
+                  {new Date(r.reviewed_at).toLocaleDateString("tr-TR")}
+                </span>
               </div>
 
               <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 leading-relaxed">{r.comment}</p>
@@ -183,6 +183,12 @@ export default function YorumlarPage() {
                     </button>
                   </div>
                 </div>
+              )}
+
+              {!r.suggested_reply && !r.is_replied && (
+                <button className="text-xs text-orange-600 hover:text-orange-700 font-medium">
+                  AI ile cevap taslağı oluştur →
+                </button>
               )}
             </div>
           ))}
