@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MessageSquare, RotateCcw, Package, ChevronRight, CheckCircle, Zap, Star, TrendingUp, Clock, Shield } from "lucide-react";
+import WaitlistSection from "@/components/WaitlistSection";
 
 const features = [
   {
@@ -304,6 +305,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Waitlist */}
+      <WaitlistSection />
 
       {/* CTA */}
       <section className="px-6 py-24">
