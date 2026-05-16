@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut } from "lucide-react";
+import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut, ShieldCheck } from "lucide-react";
 import { clsx } from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
@@ -19,13 +19,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [shopName, setShopName] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
         setUserEmail(user.email ?? null);
         setShopName(user.user_metadata?.shop_name ?? null);
+        const { data } = await supabase
+          .from("admin_users")
+          .select("id")
+          .eq("id", user.id)
+          .single();
+        setIsAdmin(!!data);
       }
     });
   }, []);
@@ -83,7 +90,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
 
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-gray-200 space-y-2">
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-2 px-3 py-2 text-xs text-purple-600 hover:bg-purple-50 rounded-lg transition-colors w-full"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Admin Paneli
+            </Link>
+          )}
           <div className="flex items-center justify-between">
             <div className="min-w-0">
               <p className="text-xs font-medium text-gray-800 truncate">{shopName ?? "Mağazam"}</p>
