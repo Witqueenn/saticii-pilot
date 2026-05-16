@@ -28,7 +28,8 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith("/giris") || pathname.startsWith("/kayit");
   const isAdminPage = pathname.startsWith("/admin");
-  const isProtected = !isAuthPage && pathname !== "/" && !pathname.startsWith("/auth");
+  const isPublic = pathname === "/" || isAuthPage || pathname.startsWith("/auth");
+  const isProtected = !isPublic;
 
   // Giriş yapmamış → /giris
   if (!user && isProtected) {
