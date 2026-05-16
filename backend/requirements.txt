@@ -1,0 +1,41 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# Database
+supabase==2.10.0
+psycopg2-binary==2.9.10
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# Task queue
+celery==5.4.0
+redis==5.2.1
+flower==2.0.1
+
+# AI / LLM
+anthropic==0.40.0
+openai==1.57.4
+tiktoken==0.8.0
+
+# HTTP
+httpx==0.28.1
+aiohttp==3.11.10
+
+# Data
+pandas==2.2.3
+python-dotenv==1.0.1
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.20
+
+# Monitoring
+sentry-sdk[fastapi]==2.19.2
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+httpx==0.28.1

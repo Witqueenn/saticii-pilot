@@ -1,0 +1,36 @@
+# Ortam dosyaları — asla commit'leme
+.env
+.env.local
+backend/.env
+frontend/.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+dist/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+out/
+build/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Logs
+*.log
