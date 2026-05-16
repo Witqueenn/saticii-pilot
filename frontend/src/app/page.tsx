@@ -99,12 +99,12 @@ export default function LandingPage() {
           İlk 3 ay %50 indirim — sınırlı kontenjan
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-6">
-          Trendyol mağazanı<br />
+          Pazaryeri mağazanı<br />
           <span className="text-orange-500">AI ile yönet</span>
         </h1>
         <p className="text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Yorumları analiz et, iadelerin nedenini öğren, ürün açıklamalarını optimize et.
-          Günde 2 saatini kurtar, satışlarını artır.
+          Trendyol, Hepsiburada, N11 ve daha fazlası. Yorumları analiz et, iadelerin nedenini öğren,
+          ürün açıklamalarını optimize et. Günde 2 saatini kurtar, satışlarını artır.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
@@ -128,7 +128,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-900">Her şey tek panelde</h2>
-            <p className="text-gray-500 mt-3">Trendyol operasyonlarını yönetmek için ihtiyacın olan her şey</p>
+            <p className="text-gray-500 mt-3">Tüm pazaryeri operasyonlarını yönetmek için ihtiyacın olan her şey</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {features.map((f) => (

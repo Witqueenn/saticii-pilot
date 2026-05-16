@@ -186,9 +186,9 @@ export default function DashboardPage() {
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-lg">Trendyol Mağazanı Bağla</h3>
+            <h3 className="font-semibold text-lg">Pazaryerini Bağla</h3>
             <p className="text-orange-100 text-sm mt-1">
-              API bilgilerini girerek gerçek veri analizini başlat. 15 dakikada hazır.
+              Trendyol, Hepsiburada, N11 ve daha fazlası. API bilgilerini girerek gerçek veri analizini başlat.
             </p>
           </div>
           <button className="bg-white text-orange-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors flex-shrink-0 ml-4">
