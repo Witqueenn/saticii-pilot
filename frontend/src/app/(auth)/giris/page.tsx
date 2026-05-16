@@ -33,39 +33,38 @@ export default function GirisPage() {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm">
-      <h2 className="text-xl font-semibold text-gray-900 mb-6">Giriş Yap</h2>
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-gray-900">Hoş geldin</h2>
+        <p className="text-gray-500 text-sm mt-1">Hesabına giriş yap</p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            E-posta
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">E-posta</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             placeholder="ornek@email.com"
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50 transition-all"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Şifre
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Şifre</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
             placeholder="••••••••"
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-gray-50 transition-all"
           />
         </div>
 
         {error && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
             {error}
           </p>
         )}
@@ -73,7 +72,7 @@ export default function GirisPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-orange-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-orange-700 disabled:opacity-60 transition-colors flex items-center justify-center gap-2"
+          className="w-full bg-orange-500 text-white py-3 rounded-xl text-sm font-semibold hover:bg-orange-600 disabled:opacity-60 transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-100"
         >
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
@@ -82,8 +81,8 @@ export default function GirisPage() {
 
       <p className="text-sm text-gray-500 text-center mt-6">
         Hesabın yok mu?{" "}
-        <Link href="/kayit" className="text-orange-600 font-medium hover:underline">
-          Kayıt Ol
+        <Link href="/kayit" className="text-orange-600 font-semibold hover:underline">
+          Ücretsiz kayıt ol
         </Link>
       </p>
     </div>

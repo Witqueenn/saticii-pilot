@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MessageSquare, RotateCcw, Package, ChevronRight, CheckCircle, Zap, Star } from "lucide-react";
+import { MessageSquare, RotateCcw, Package, ChevronRight, CheckCircle, Zap, Star, TrendingUp, Clock, Shield } from "lucide-react";
 
 const features = [
   {
@@ -7,44 +7,56 @@ const features = [
     title: "Yorum Merkezi",
     description: "AI yorumlarını analiz eder, duygu tespiti yapar ve her yorum için cevap taslağı hazırlar. Acil yorumları anında öne çıkarır.",
     color: "bg-blue-50 text-blue-600",
+    stat: "3dk",
+    statLabel: "ortalama yanıt süresi",
   },
   {
     icon: RotateCcw,
     title: "İade Analizi",
     description: "Hangi ürün neden iade ediliyor? Tekrar eden kalıpları tespit eder, beden tablosu ve fotoğraf iyileştirme önerileri sunar.",
     color: "bg-red-50 text-red-600",
+    stat: "%34",
+    statLabel: "ortalama iade azalması",
   },
   {
     icon: Package,
     title: "Ürün Optimizasyonu",
     description: "Her ürünün açıklama ve SEO puanını hesaplar. Düşük puanlı ürünler için AI ile iyileştirilmiş içerik oluşturur.",
     color: "bg-orange-50 text-orange-600",
+    stat: "2x",
+    statLabel: "daha fazla organik trafik",
   },
+];
+
+const steps = [
+  { num: "01", title: "Hesabını oluştur", desc: "2 dakikada ücretsiz kayıt ol, kredi kartı gerekmez." },
+  { num: "02", title: "Pazaryerini bağla", desc: "Trendyol, Hepsiburada, N11 ve diğer platformları API ile entegre et." },
+  { num: "03", title: "AI çalışmaya başlar", desc: "Yorumlar analiz edilir, iadeler takip edilir, öneriler hazırlanır." },
 ];
 
 const plans = [
   {
     name: "Temel",
     price: "499",
+    originalPrice: "998",
     desc: "Başlangıç için ideal",
     features: ["1 mağaza", "Yorum merkezi", "İade takibi", "Günlük özet"],
-    cta: "Başla",
     highlight: false,
   },
   {
     name: "Profesyonel",
     price: "999",
+    originalPrice: "1.998",
     desc: "Büyüyen mağazalar için",
     features: ["3 mağazaya kadar", "AI cevap taslakları", "Ürün optimizasyonu", "Öncelikli destek"],
-    cta: "En Popüler",
     highlight: true,
   },
   {
     name: "Kurumsal",
     price: "2.499",
+    originalPrice: "4.998",
     desc: "Profesyonel satıcılar için",
     features: ["Sınırsız mağaza", "Tüm AI özellikler", "Özel raporlar", "7/24 destek"],
-    cta: "Başla",
     highlight: false,
   },
 ];
@@ -55,111 +67,174 @@ const testimonials = [
     shop: "ModaMira Butik",
     text: "İade oranım %22'den %11'e düştü. Beden tablosu önerisini uyguladım, fark inanılmaz.",
     rating: 5,
+    platform: "Trendyol",
   },
   {
     name: "Mehmet T.",
     shop: "Trendyol Tekstil",
     text: "Günde 50+ yorum geliyordu, hepsine tek tek cevap vermek zordu. Şimdi AI taslakları 10 dakikada bitiriyorum.",
     rating: 5,
+    platform: "Hepsiburada",
   },
   {
     name: "Selin A.",
     shop: "Sezon Koleksiyonu",
     text: "Ürün açıklama puanım 38'den 74'e çıktı. Organik trafik ciddi arttı.",
     rating: 5,
+    platform: "N11",
   },
 ];
+
+const platforms = ["Trendyol", "Hepsiburada", "N11", "Amazon TR", "Çiçeksepeti", "GittiGidiyor"];
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Nav */}
-      <nav className="border-b border-gray-100 px-6 py-4 flex items-center justify-between max-w-6xl mx-auto">
-        <div>
-          <span className="font-bold text-gray-900 text-lg">SatıcıPilot</span>
-          <span className="ml-2 text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">Erken Erişim</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link href="/giris" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
-            Giriş Yap
-          </Link>
-          <Link
-            href="/kayit"
-            className="text-sm bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium"
-          >
-            Ücretsiz Dene
-          </Link>
+      <nav className="border-b border-gray-100 px-6 py-4 sticky top-0 bg-white/90 backdrop-blur-sm z-10">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-900 text-lg">SatıcıPilot</span>
+            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">Erken Erişim</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link href="/giris" className="text-sm text-gray-600 hover:text-gray-900 transition-colors hidden sm:block">
+              Giriş Yap
+            </Link>
+            <Link
+              href="/kayit"
+              className="text-sm bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors font-medium"
+            >
+              Ücretsiz Dene
+            </Link>
+          </div>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="px-6 py-20 max-w-4xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 bg-orange-50 text-orange-600 px-4 py-2 rounded-full text-sm font-medium mb-6">
-          <Zap className="w-4 h-4" />
-          İlk 3 ay %50 indirim — sınırlı kontenjan
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-50 via-white to-white pointer-events-none" />
+        <div className="relative px-6 py-24 max-w-4xl mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-600 px-4 py-2 rounded-full text-sm font-medium mb-8">
+            <Zap className="w-4 h-4" />
+            İlk 3 ay %50 indirim — sınırlı kontenjan
+          </div>
+          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-[1.1] mb-6 tracking-tight">
+            Pazaryeri mağazanı<br />
+            <span className="text-orange-500">AI ile yönet</span>
+          </h1>
+          <p className="text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
+            Yorumları analiz et, iadelerin nedenini öğren, ürün açıklamalarını optimize et.
+            <strong className="text-gray-700"> Günde 2 saatini kurtar, satışlarını artır.</strong>
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+            <Link
+              href="/kayit"
+              className="bg-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-all text-base flex items-center justify-center gap-2 shadow-lg shadow-orange-200"
+            >
+              14 Gün Ücretsiz Başla <ChevronRight className="w-5 h-5" />
+            </Link>
+            <Link
+              href="/giris"
+              className="border border-gray-200 text-gray-700 px-8 py-4 rounded-xl font-medium hover:bg-gray-50 transition-colors text-base"
+            >
+              Demo Gör
+            </Link>
+          </div>
+          <p className="text-sm text-gray-400">Kredi kartı gerekmez · Kurulum yok · 2 dakikada hazır</p>
+
+          {/* Platform rozetleri */}
+          <div className="mt-14">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 font-medium">Desteklenen platformlar</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {platforms.map((p) => (
+                <span key={p} className="text-sm text-gray-500 bg-gray-100 px-4 py-1.5 rounded-full font-medium">
+                  {p}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-6">
-          Pazaryeri mağazanı<br />
-          <span className="text-orange-500">AI ile yönet</span>
-        </h1>
-        <p className="text-xl text-gray-500 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Trendyol, Hepsiburada, N11 ve daha fazlası. Yorumları analiz et, iadelerin nedenini öğren,
-          ürün açıklamalarını optimize et. Günde 2 saatini kurtar, satışlarını artır.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Link
-            href="/kayit"
-            className="bg-orange-500 text-white px-8 py-3.5 rounded-xl font-medium hover:bg-orange-600 transition-colors text-base flex items-center justify-center gap-2"
-          >
-            14 Gün Ücretsiz Başla <ChevronRight className="w-4 h-4" />
-          </Link>
-          <Link
-            href="/giris"
-            className="border border-gray-200 text-gray-700 px-8 py-3.5 rounded-xl font-medium hover:bg-gray-50 transition-colors text-base"
-          >
-            Demo Gör
-          </Link>
+      </section>
+
+      {/* Stats bar */}
+      <section className="border-y border-gray-100 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-6 py-8 grid grid-cols-3 gap-6 text-center">
+          {[
+            { icon: TrendingUp, value: "%34", label: "Ortalama iade azalması" },
+            { icon: Clock, value: "2 saat", label: "Günlük tasarruf" },
+            { icon: Shield, value: "500+", label: "Aktif satıcı" },
+          ].map((s) => (
+            <div key={s.label}>
+              <p className="text-3xl font-bold text-gray-900">{s.value}</p>
+              <p className="text-sm text-gray-500 mt-1">{s.label}</p>
+            </div>
+          ))}
         </div>
-        <p className="text-sm text-gray-400 mt-4">Kredi kartı gerekmez · Kurulum yok · 2 dakikada hazır</p>
       </section>
 
       {/* Özellikler */}
-      <section className="px-6 py-16 bg-gray-50">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900">Her şey tek panelde</h2>
-            <p className="text-gray-500 mt-3">Tüm pazaryeri operasyonlarını yönetmek için ihtiyacın olan her şey</p>
+      <section className="px-6 py-20 max-w-5xl mx-auto">
+        <div className="text-center mb-14">
+          <h2 className="text-3xl font-bold text-gray-900">Her şey tek panelde</h2>
+          <p className="text-gray-500 mt-3 text-lg">Tüm pazaryeri operasyonlarını yönetmek için ihtiyacın olan her şey</p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {features.map((f) => (
+            <div key={f.title} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 hover:border-orange-200 hover:shadow-md transition-all">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${f.color}`}>
+                <f.icon className="w-6 h-6" />
+              </div>
+              <h3 className="font-semibold text-gray-900 text-lg">{f.title}</h3>
+              <p className="text-gray-500 text-sm leading-relaxed">{f.description}</p>
+              <div className="pt-2 border-t border-gray-100">
+                <span className="text-2xl font-bold text-gray-900">{f.stat}</span>
+                <span className="text-sm text-gray-400 ml-2">{f.statLabel}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Nasıl çalışır */}
+      <section className="px-6 py-20 bg-gray-50">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-14">
+            <h2 className="text-3xl font-bold text-gray-900">3 adımda başla</h2>
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {features.map((f) => (
-              <div key={f.title} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${f.color}`}>
-                  <f.icon className="w-6 h-6" />
+          <div className="space-y-6">
+            {steps.map((s, i) => (
+              <div key={s.num} className="flex items-start gap-6 bg-white rounded-2xl border border-gray-200 p-6">
+                <span className="text-3xl font-black text-orange-200 flex-shrink-0">{s.num}</span>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-lg">{s.title}</h3>
+                  <p className="text-gray-500 text-sm mt-1">{s.desc}</p>
                 </div>
-                <h3 className="font-semibold text-gray-900 text-lg">{f.title}</h3>
-                <p className="text-gray-500 text-sm leading-relaxed">{f.description}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Sosyal kanıt */}
-      <section className="px-6 py-16 max-w-5xl mx-auto">
-        <div className="text-center mb-12">
+      {/* Yorumlar */}
+      <section className="px-6 py-20 max-w-5xl mx-auto">
+        <div className="text-center mb-14">
           <h2 className="text-3xl font-bold text-gray-900">Satıcılar ne diyor?</h2>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {testimonials.map((t) => (
             <div key={t.name} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-              <div className="flex gap-0.5">
-                {Array.from({ length: t.rating }).map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                ))}
+              <div className="flex items-center justify-between">
+                <div className="flex gap-0.5">
+                  {Array.from({ length: t.rating }).map((_, i) => (
+                    <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                  ))}
+                </div>
+                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{t.platform}</span>
               </div>
               <p className="text-gray-700 text-sm leading-relaxed">"{t.text}"</p>
               <div>
-                <p className="font-medium text-gray-900 text-sm">{t.name}</p>
+                <p className="font-semibold text-gray-900 text-sm">{t.name}</p>
                 <p className="text-xs text-gray-400">{t.shop}</p>
               </div>
             </div>
@@ -168,39 +243,43 @@ export default function LandingPage() {
       </section>
 
       {/* Fiyatlandırma */}
-      <section className="px-6 py-16 bg-gray-50">
+      <section className="px-6 py-20 bg-gray-50">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
+          <div className="text-center mb-4">
             <h2 className="text-3xl font-bold text-gray-900">Şeffaf fiyatlandırma</h2>
-            <p className="text-gray-500 mt-3">
-              <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-medium text-sm">Erken erişim:</span>
-              {" "}İlk 3 ay tüm planlarda %50 indirim
-            </p>
           </div>
+          <p className="text-center text-gray-500 mb-12">
+            <span className="bg-orange-100 text-orange-600 px-3 py-1 rounded-full font-medium text-sm">
+              Erken erişim: İlk 3 ay tüm planlarda %50 indirim
+            </span>
+          </p>
           <div className="grid md:grid-cols-3 gap-6">
             {plans.map((p) => (
               <div
                 key={p.name}
                 className={`rounded-2xl border p-6 space-y-6 relative ${
                   p.highlight
-                    ? "border-orange-400 bg-white shadow-lg shadow-orange-100"
+                    ? "border-orange-400 bg-white shadow-xl shadow-orange-100"
                     : "border-gray-200 bg-white"
                 }`}
               >
                 {p.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="bg-orange-500 text-white text-xs font-medium px-3 py-1 rounded-full">
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                    <span className="bg-orange-500 text-white text-xs font-semibold px-4 py-1.5 rounded-full">
                       En Popüler
                     </span>
                   </div>
                 )}
                 <div>
-                  <p className="font-semibold text-gray-900">{p.name}</p>
+                  <p className="font-bold text-gray-900 text-lg">{p.name}</p>
                   <p className="text-gray-400 text-sm mt-0.5">{p.desc}</p>
                 </div>
                 <div>
-                  <span className="text-3xl font-bold text-gray-900">₺{p.price}</span>
-                  <span className="text-gray-400 text-sm">/ay</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-black text-gray-900">₺{p.price}</span>
+                    <span className="text-gray-400 text-sm">/ay</span>
+                  </div>
+                  <p className="text-xs text-gray-400 line-through mt-0.5">Normal fiyat: ₺{p.originalPrice}</p>
                 </div>
                 <ul className="space-y-2.5">
                   {p.features.map((f) => (
@@ -212,10 +291,10 @@ export default function LandingPage() {
                 </ul>
                 <Link
                   href="/kayit"
-                  className={`block text-center py-2.5 rounded-xl font-medium text-sm transition-colors ${
+                  className={`block text-center py-3 rounded-xl font-semibold text-sm transition-all ${
                     p.highlight
-                      ? "bg-orange-500 text-white hover:bg-orange-600"
-                      : "border border-gray-200 text-gray-700 hover:bg-gray-50"
+                      ? "bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-200"
+                      : "border-2 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
                   }`}
                 >
                   Başla
@@ -227,19 +306,21 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="px-6 py-20 max-w-3xl mx-auto text-center">
-        <h2 className="text-3xl font-bold text-gray-900 mb-4">
-          Hemen başla, 14 gün ücretsiz kullan
-        </h2>
-        <p className="text-gray-500 mb-8">
-          Kurulum yok, kredi kartı gerekmez. 2 dakikada hesabını oluştur.
-        </p>
-        <Link
-          href="/kayit"
-          className="inline-flex items-center gap-2 bg-orange-500 text-white px-8 py-4 rounded-xl font-medium hover:bg-orange-600 transition-colors text-base"
-        >
-          Ücretsiz Hesap Aç <ChevronRight className="w-4 h-4" />
-        </Link>
+      <section className="px-6 py-24">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">
+            Hemen başla, 14 gün ücretsiz kullan
+          </h2>
+          <p className="text-gray-500 mb-10 text-lg">
+            Kurulum yok, kredi kartı gerekmez. 2 dakikada hesabını oluştur.
+          </p>
+          <Link
+            href="/kayit"
+            className="inline-flex items-center gap-2 bg-orange-500 text-white px-10 py-4 rounded-xl font-semibold hover:bg-orange-600 transition-all text-lg shadow-lg shadow-orange-200"
+          >
+            Ücretsiz Hesap Aç <ChevronRight className="w-5 h-5" />
+          </Link>
+        </div>
       </section>
 
       {/* Footer */}
@@ -248,8 +329,8 @@ export default function LandingPage() {
           <span className="font-bold text-gray-900">SatıcıPilot</span>
           <p className="text-sm text-gray-400">© 2026 SatıcıPilot. Tüm hakları saklıdır.</p>
           <div className="flex gap-4 text-sm text-gray-400">
-            <a href="#" className="hover:text-gray-600">Gizlilik</a>
-            <a href="#" className="hover:text-gray-600">Kullanım Şartları</a>
+            <a href="#" className="hover:text-gray-600 transition-colors">Gizlilik</a>
+            <a href="#" className="hover:text-gray-600 transition-colors">Kullanım Şartları</a>
           </div>
         </div>
       </footer>
