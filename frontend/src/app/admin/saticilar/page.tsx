@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Search, CheckCircle, XCircle, ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { ListSkeleton } from "@/components/Skeleton";
 
 interface Seller {
   id: string;
@@ -137,7 +138,20 @@ export default function SaticilarPage() {
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-gray-400">Yükleniyor...</td>
+                <td colSpan={5} className="p-4">
+                  <div className="space-y-3">
+                    {[1,2,3,4].map(i => (
+                      <div key={i} className="flex items-center gap-4 animate-pulse">
+                        <div className="w-8 h-8 bg-gray-200 rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-1.5">
+                          <div className="h-3 bg-gray-200 rounded w-1/3" />
+                          <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+                        </div>
+                        <div className="h-5 w-20 bg-gray-200 rounded-full" />
+                      </div>
+                    ))}
+                  </div>
+                </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Package } from "lucide-react";
+import { Skeleton } from "@/components/Skeleton";
 
 interface Product {
   id: string;
@@ -92,8 +93,22 @@ export default function UrunlerPage() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
-          Yükleniyor...
+        <div className="space-y-4">
+          {[1,2,3].map(i => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+              <div className="flex justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <Skeleton className="h-5 w-16 rounded-full" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { MessageSquare, AlertTriangle, Package, RotateCcw, TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
+import { MessageSquare, AlertTriangle, Package, RotateCcw, TrendingDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { CardSkeleton } from "@/components/Skeleton";
 
 interface Summary {
   totalReviews: number;
@@ -110,7 +111,11 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        {stats.map((s) => (
+        {loading ? (
+          <>
+            <CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton />
+          </>
+        ) : stats.map((s) => (
           <Link
             key={s.label}
             href={s.href}
@@ -146,7 +151,9 @@ export default function DashboardPage() {
         </div>
         <div className="divide-y divide-gray-100">
           {loading ? (
-            <p className="p-5 text-sm text-gray-400 text-center">Yükleniyor...</p>
+            <div className="p-4 space-y-3">
+              {[1,2,3].map(i => <div key={i} className="h-10 animate-pulse bg-gray-100 rounded-lg" />)}
+            </div>
           ) : !hasData ? (
             <p className="p-6 text-sm text-gray-400 text-center">Şu an bekleyen aksiyon yok.</p>
           ) : (

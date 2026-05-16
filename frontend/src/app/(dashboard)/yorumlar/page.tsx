@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AlertTriangle, CheckCircle, MessageSquare, Clock, Filter } from "lucide-react";
 import { clsx } from "clsx";
+import { ReviewSkeleton } from "@/components/Skeleton";
 
 interface Review {
   id: string;
@@ -118,8 +119,8 @@ export default function YorumlarPage() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
-          Yükleniyor...
+        <div className="space-y-4">
+          <ReviewSkeleton /><ReviewSkeleton /><ReviewSkeleton />
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">

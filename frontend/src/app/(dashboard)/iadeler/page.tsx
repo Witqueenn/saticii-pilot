@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { RotateCcw } from "lucide-react";
+import { Skeleton } from "@/components/Skeleton";
 
 interface Return {
   id: string;
@@ -109,8 +110,20 @@ export default function IadelerPage() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
-          Yükleniyor...
+        <div className="space-y-4">
+          {[1,2].map(i => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+              <div className="flex justify-between">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+                <Skeleton className="h-6 w-24 rounded-full" />
+              </div>
+              <Skeleton className="h-2 w-full rounded-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          ))}
         </div>
       ) : patterns.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
