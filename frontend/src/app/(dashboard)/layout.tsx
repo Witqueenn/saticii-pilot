@@ -6,6 +6,7 @@ import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut, ShieldCheck
 import { clsx } from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
+import OnboardingModal from "@/components/OnboardingModal";
 
 const navItems = [
   { href: "/genel", label: "Genel Bakış", icon: LayoutDashboard },
@@ -22,6 +23,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [shopName, setShopName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -29,12 +31,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (user) {
         setUserEmail(user.email ?? null);
         setShopName(user.user_metadata?.shop_name ?? null);
-        const { data } = await supabase
-          .from("admin_users")
-          .select("id")
-          .eq("id", user.id)
-          .single();
-        setIsAdmin(!!data);
+
+        const [{ data: adminData }, { data: seller }] = await Promise.all([
+          supabase.from("admin_users").select("id").eq("id", user.id).single(),
+          supabase.from("sellers").select("onboarding_done").eq("id", user.id).single(),
+        ]);
+
+        setIsAdmin(!!adminData);
+        if (seller && !seller.onboarding_done) setShowOnboarding(true);
       }
     });
   }, []);
@@ -122,6 +126,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
         {children}
       </main>
+
+      {showOnboarding && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
 
       {/* ── Mobil alt nav bar ─────────────────────────── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex z-10">
