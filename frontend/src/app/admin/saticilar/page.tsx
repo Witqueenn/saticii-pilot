@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Search, CheckCircle, XCircle } from "lucide-react";
+import { Search, CheckCircle, XCircle, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 interface Seller {
   id: string;
@@ -19,11 +20,22 @@ const planColor: Record<string, string> = {
   kurumsal: "bg-purple-100 text-purple-700",
 };
 
+const planLabel: Record<string, string> = {
+  temel: "Temel",
+  profesyonel: "Profesyonel",
+  kurumsal: "Kurumsal",
+};
+
 const planOptions = ["temel", "profesyonel", "kurumsal"];
+
+type FilterPlan = "hepsi" | "temel" | "profesyonel" | "kurumsal";
+type FilterStatus = "hepsi" | "aktif" | "pasif";
 
 export default function SaticilarPage() {
   const [sellers, setSellers] = useState<Seller[]>([]);
   const [search, setSearch] = useState("");
+  const [filterPlan, setFilterPlan] = useState<FilterPlan>("hepsi");
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("hepsi");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -58,31 +70,56 @@ export default function SaticilarPage() {
     );
   }
 
-  const filtered = sellers.filter(
-    (s) =>
+  const filtered = sellers.filter((s) => {
+    const matchSearch =
       s.shop_name.toLowerCase().includes(search.toLowerCase()) ||
-      s.email.toLowerCase().includes(search.toLowerCase())
-  );
+      s.email.toLowerCase().includes(search.toLowerCase());
+    const matchPlan = filterPlan === "hepsi" || s.plan === filterPlan;
+    const matchStatus =
+      filterStatus === "hepsi" ||
+      (filterStatus === "aktif" && s.is_active) ||
+      (filterStatus === "pasif" && !s.is_active);
+    return matchSearch && matchPlan && matchStatus;
+  });
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Satıcılar</h2>
-          <p className="text-gray-500 mt-1">{sellers.length} kayıtlı satıcı</p>
-        </div>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Satıcılar</h2>
+        <p className="text-gray-500 mt-1">{sellers.length} kayıtlı satıcı</p>
       </div>
 
-      {/* Arama */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Mağaza adı veya email ara..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-        />
+      {/* Filtreler */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Mağaza adı veya email ara..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+          />
+        </div>
+        <select
+          value={filterPlan}
+          onChange={(e) => setFilterPlan(e.target.value as FilterPlan)}
+          className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+        >
+          <option value="hepsi">Tüm Planlar</option>
+          <option value="temel">Temel</option>
+          <option value="profesyonel">Profesyonel</option>
+          <option value="kurumsal">Kurumsal</option>
+        </select>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
+          className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+        >
+          <option value="hepsi">Tüm Durumlar</option>
+          <option value="aktif">Aktif</option>
+          <option value="pasif">Pasif</option>
+        </select>
       </div>
 
       {/* Tablo */}
@@ -92,25 +129,33 @@ export default function SaticilarPage() {
             <tr>
               <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Mağaza</th>
               <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Plan</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Kayıt Tarihi</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">Kayıt Tarihi</th>
               <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Durum</th>
+              <th className="px-5 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-gray-400">Yükleniyor...</td>
+                <td colSpan={5} className="px-5 py-8 text-center text-gray-400">Yükleniyor...</td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-5 py-8 text-center text-gray-400">Satıcı bulunamadı.</td>
+                <td colSpan={5} className="px-5 py-8 text-center text-gray-400">Satıcı bulunamadı.</td>
               </tr>
             ) : (
               filtered.map((s) => (
                 <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-5 py-3">
-                    <p className="font-medium text-gray-900">{s.shop_name}</p>
-                    <p className="text-xs text-gray-400">{s.email}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        {s.shop_name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">{s.shop_name}</p>
+                        <p className="text-xs text-gray-400">{s.email}</p>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-5 py-3">
                     <select
@@ -119,13 +164,11 @@ export default function SaticilarPage() {
                       className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${planColor[s.plan]}`}
                     >
                       {planOptions.map((p) => (
-                        <option key={p} value={p}>
-                          {p.charAt(0).toUpperCase() + p.slice(1)}
-                        </option>
+                        <option key={p} value={p}>{planLabel[p]}</option>
                       ))}
                     </select>
                   </td>
-                  <td className="px-5 py-3 text-gray-500 text-xs">
+                  <td className="px-5 py-3 text-gray-500 text-xs hidden sm:table-cell">
                     {new Date(s.created_at).toLocaleDateString("tr-TR")}
                   </td>
                   <td className="px-5 py-3">
@@ -139,6 +182,14 @@ export default function SaticilarPage() {
                         <><XCircle className="w-4 h-4 text-gray-400" /><span className="text-gray-400">Pasif</span></>
                       )}
                     </button>
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <Link
+                      href={`/admin/saticilar/${s.id}`}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Link>
                   </td>
                 </tr>
               ))
