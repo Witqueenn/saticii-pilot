@@ -9,6 +9,15 @@ export const metadata: Metadata = {
 
 const posts = [
   {
+    slug: "pazaryeri-karsilastirma",
+    title: "Trendyol vs Hepsiburada vs N11 vs Amazon TR: Hangi Pazaryeri Doğru?",
+    excerpt: "4 büyük Türk e-ticaret platformunu komisyon, kategori, onay süresi ve satıcı deneyimi açısından karşılaştırıyoruz.",
+    date: "14 Mayıs 2026",
+    readTime: "11 dk",
+    tag: "Karşılaştırma",
+    tagColor: "bg-blue-100 text-blue-700",
+  },
+  {
     slug: "trendyol-satis-puani-yukseltme",
     title: "Trendyol Satış Puanı Nasıl Yükseltilir? (2026 Rehberi)",
     excerpt: "Trendyol mağaza puanını artırmanın 8 kanıtlanmış yolu. Yorum yönetimi, kargo süresi ve iade oranıyla puanını yükselt.",
@@ -52,6 +61,42 @@ const posts = [
     readTime: "8 dk",
     tag: "İade Yönetimi",
     tagColor: "bg-red-100 text-red-700",
+  },
+  {
+    slug: "hepsiburada-magaza-acma",
+    title: "Hepsiburada'da Mağaza Açma ve Satıcı Olma Rehberi (2026)",
+    excerpt: "Hepsiburada başvuru süreci, gerekli belgeler, komisyon oranları ve HepsiJet lojistik avantajları hakkında her şey.",
+    date: "3 Mayıs 2026",
+    readTime: "9 dk",
+    tag: "Başlangıç Rehberi",
+    tagColor: "bg-green-100 text-green-700",
+  },
+  {
+    slug: "n11-magaza-acma",
+    title: "N11'de Mağaza Nasıl Açılır? Satıcı Rehberi 2026",
+    excerpt: "30 milyon üyeli N11'de satış yapmak için gereken belgeler, başvuru adımları ve komisyon oranları.",
+    date: "1 Mayıs 2026",
+    readTime: "8 dk",
+    tag: "Başlangıç Rehberi",
+    tagColor: "bg-green-100 text-green-700",
+  },
+  {
+    slug: "amazon-turkiye-satici-olma",
+    title: "Amazon Türkiye'de Satıcı Olma Rehberi 2026",
+    excerpt: "Amazon TR'de bireysel ve profesyonel hesap farkı, FBA lojistik avantajları ve başvuru süreci.",
+    date: "28 Nisan 2026",
+    readTime: "10 dk",
+    tag: "Başlangıç Rehberi",
+    tagColor: "bg-green-100 text-green-700",
+  },
+  {
+    slug: "ciceksepeti-satici-olma",
+    title: "Çiçeksepeti'nde Satıcı Olma Rehberi 2026",
+    excerpt: "Hızla büyüyen Çiçeksepeti'nde mağaza açmak için gereken belgeler, hangi ürünler satar ve kampanya stratejileri.",
+    date: "25 Nisan 2026",
+    readTime: "8 dk",
+    tag: "Başlangıç Rehberi",
+    tagColor: "bg-green-100 text-green-700",
   },
 ];
 
