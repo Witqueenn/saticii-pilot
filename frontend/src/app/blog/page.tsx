@@ -9,6 +9,33 @@ export const metadata: Metadata = {
 
 const posts = [
   {
+    slug: "trendyol-satis-puani-yukseltme",
+    title: "Trendyol Satış Puanı Nasıl Yükseltilir? (2026 Rehberi)",
+    excerpt: "Trendyol mağaza puanını artırmanın 8 kanıtlanmış yolu. Yorum yönetimi, kargo süresi ve iade oranıyla puanını yükselt.",
+    date: "10 Mayıs 2026",
+    readTime: "9 dk",
+    tag: "Satıcı Rehberi",
+    tagColor: "bg-orange-100 text-orange-700",
+  },
+  {
+    slug: "trendyol-magaza-acma-rehberi",
+    title: "Trendyol'da Mağaza Nasıl Açılır? Adım Adım Rehber",
+    excerpt: "Gerekli belgeler, başvuru süreci, komisyon oranları ve ilk satışa kadar yapman gerekenler. Yeni satıcılar için eksiksiz rehber.",
+    date: "5 Mayıs 2026",
+    readTime: "10 dk",
+    tag: "Başlangıç",
+    tagColor: "bg-green-100 text-green-700",
+  },
+  {
+    slug: "trendyol-urun-aciklamasi-seo",
+    title: "Trendyol'da Ürün Açıklaması SEO: Arama Sıralamanı Yükselt",
+    excerpt: "Trendyol arama algoritmasını anlayarak ürün başlıkları ve açıklamalarını optimize et. Organik görünürlüğünü artır.",
+    date: "8 Mayıs 2026",
+    readTime: "7 dk",
+    tag: "SEO & Optimizasyon",
+    tagColor: "bg-purple-100 text-purple-700",
+  },
+  {
     slug: "trendyol-yorum-yonetimi",
     title: "Trendyol'da Yorum Yönetimi: Satışlarını Artıracak 7 Strateji",
     excerpt: "Olumsuz yorumlar dönüşüm oranını %30'a kadar düşürebilir. Profesyonel yorum yönetimi ile mağaza puanını nasıl yükseltirsin?",

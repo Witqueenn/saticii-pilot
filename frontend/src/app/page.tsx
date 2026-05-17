@@ -128,9 +128,57 @@ const testimonials = [
   },
 ];
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://saticii-pilot.vercel.app/#organization",
+      "name": "SatıcıPilot",
+      "url": "https://saticii-pilot.vercel.app",
+      "description": "Trendyol ve pazaryeri satıcıları için AI destekli operasyon asistanı",
+      "foundingDate": "2026",
+      "areaServed": "TR",
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "SatıcıPilot",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Trendyol satıcıları için yorum yönetimi, iade takibi ve ürün optimizasyonu platformu",
+      "offers": [
+        { "@type": "Offer", "name": "Temel", "price": "499", "priceCurrency": "TRY", "billingDuration": "P1M" },
+        { "@type": "Offer", "name": "Profesyonel", "price": "999", "priceCurrency": "TRY", "billingDuration": "P1M" },
+        { "@type": "Offer", "name": "Kurumsal", "price": "2499", "priceCurrency": "TRY", "billingDuration": "P1M" },
+      ],
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "SatıcıPilot hangi platformları destekliyor?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Şu an Trendyol aktif olarak destekleniyor. Hepsiburada, N11, Amazon TR ve Çiçeksepeti yakında eklenecek." },
+        },
+        {
+          "@type": "Question",
+          "name": "Ücretsiz deneme var mı?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Evet, 14 gün ücretsiz deneme sunuyoruz. Kredi kartı gerekmez." },
+        },
+        {
+          "@type": "Question",
+          "name": "SatıcıPilot nasıl iade oranını düşürüyor?",
+          "acceptedAnswer": { "@type": "Answer", "text": "İade nedenlerini analiz ederek beden tablosu hataları, fotoğraf uyumsuzlukları ve ürün açıklama eksiklerini tespit eder. Bu sorunları gidermek iade oranını %34'e kadar düşürebilir." },
+        },
+      ],
+    },
+  ],
+};
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {/* Nav */}
       <nav className="border-b border-gray-100 px-6 py-4 sticky top-0 bg-white/90 backdrop-blur-sm z-10">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
