@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Send, Tag, Calendar, Trash2, Loader2, CheckCircle,
   Megaphone, Mail, Sparkles, Copy, Hash, Zap, ToggleLeft, ToggleRight,
-  BarChart2, Smartphone, MousePointerClick, Eye,
+  BarChart2, Smartphone, MousePointerClick, Eye, Image, Download, Coins,
 } from "lucide-react";
 import ProGate from "@/components/ProGate";
 
@@ -85,7 +85,7 @@ export default function PazarlamaPage() {
   const [plan, setPlan] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [tab, setTab] = useState<"kampanya" | "email" | "otomasyon" | "performans" | "sms">("kampanya");
+  const [tab, setTab] = useState<"kampanya" | "email" | "otomasyon" | "performans" | "sms" | "gorsel">("kampanya");
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [showAutoForm, setShowAutoForm] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
@@ -121,6 +121,14 @@ export default function PazarlamaPage() {
   const [emailSends, setEmailSends] = useState<EmailSend[]>([]);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null);
+
+  // Görsel
+  const [imageTokens, setImageTokens] = useState<number | null>(null);
+  const [imageProduct, setImageProduct] = useState("");
+  const [imageStyle, setImageStyle] = useState("beyaz");
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   // AI
   const [generatingAI, setGeneratingAI] = useState(false);
@@ -185,6 +193,11 @@ export default function PazarlamaPage() {
         .order("created_at", { ascending: false })
         .limit(200);
       setEmailSends(sends ?? []);
+
+      // Görsel token
+      const tokenRes = await fetch("/api/pazarlama/gorsel");
+      const tokenData = await tokenRes.json();
+      setImageTokens(tokenData.tokens ?? 0);
     }
     load();
   }, [loadSegmentCounts]);
@@ -286,6 +299,26 @@ export default function PazarlamaPage() {
     if (data.sent > 0) setSmsMessage("");
   }
 
+  async function generateImage() {
+    if (!imageProduct) return;
+    setGeneratingImage(true);
+    setGeneratedImage(null);
+    setImageError(null);
+    const res = await fetch("/api/pazarlama/gorsel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product: imageProduct, style: imageStyle }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      setGeneratedImage(data.url);
+      setImageTokens(data.remaining);
+    } else {
+      setImageError(data.error ?? "Görsel oluşturulamadı");
+    }
+    setGeneratingImage(false);
+  }
+
   async function sendEmail() {
     setSending(true);
     setSendResult(null);
@@ -322,17 +355,18 @@ export default function PazarlamaPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-xl w-fit">
         {[
           { key: "kampanya", label: "Kampanyalar", icon: Megaphone },
           { key: "email", label: "E-posta", icon: Mail },
+          { key: "gorsel", label: "Görsel AI", icon: Image },
           { key: "sms", label: "SMS", icon: Smartphone },
           { key: "otomasyon", label: "Otomasyonlar", icon: Zap },
           { key: "performans", label: "Performans", icon: BarChart2 },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
-            onClick={() => setTab(key as "kampanya" | "email")}
+            onClick={() => setTab(key as typeof tab)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               tab === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
             }`}
@@ -612,6 +646,109 @@ export default function PazarlamaPage() {
           </div>
         </div>
       )}
+      {/* ── Görsel AI Tab ── */}
+      {tab === "gorsel" && (
+        <div className="space-y-5">
+          {/* Token sayacı */}
+          <div className="flex items-center justify-between bg-white border border-gray-200 rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
+                <Coins className="w-5 h-5 text-violet-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Görsel Token</p>
+                <p className="text-xs text-gray-500">Her görsel 1 token tüketir</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-black text-violet-600">{imageTokens ?? "—"}</p>
+              <p className="text-xs text-gray-400">kalan token</p>
+            </div>
+          </div>
+
+          {imageTokens === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+              Token'ların bitti. Ek token için{" "}
+              <a href="mailto:destek@saticipilot.com?subject=Görsel Token Satın Alma" className="font-semibold underline">
+                destek@saticipilot.com
+              </a>{" "}
+              ile iletişime geç.
+            </div>
+          )}
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+            {/* Ürün açıklaması */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Ürün / Açıklama</label>
+              <input
+                type="text"
+                value={imageProduct}
+                onChange={(e) => setImageProduct(e.target.value)}
+                placeholder="Örn: kırmızı çiçek desenli yazlık elbise"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-gray-50"
+              />
+            </div>
+
+            {/* Stil seçimi */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Görsel Stili</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: "beyaz", label: "Ürün Fotoğrafı", desc: "Beyaz zemin, stüdyo" },
+                  { key: "instagram", label: "Instagram Post", desc: "Estetik flat lay" },
+                  { key: "kampanya", label: "Kampanya Banner", desc: "İndirim temalı" },
+                  { key: "lifestyle", label: "Lifestyle", desc: "Gerçek ortam" },
+                ].map(({ key, label, desc }) => (
+                  <button
+                    key={key}
+                    onClick={() => setImageStyle(key)}
+                    className={`p-3 rounded-xl border text-left transition-all ${
+                      imageStyle === key ? "border-violet-400 bg-violet-50" : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <p className={`text-sm font-medium ${imageStyle === key ? "text-violet-700" : "text-gray-800"}`}>{label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {imageError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{imageError}</div>
+            )}
+
+            <button
+              onClick={generateImage}
+              disabled={generatingImage || !imageProduct || (imageTokens ?? 0) === 0}
+              className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            >
+              {generatingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {generatingImage ? "Oluşturuluyor... (~15sn)" : "Görsel Oluştur (1 token)"}
+            </button>
+          </div>
+
+          {/* Sonuç */}
+          {generatedImage && (
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+              <p className="text-sm font-semibold text-gray-700">Oluşturulan Görsel</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={generatedImage} alt="AI görseli" className="w-full rounded-xl border border-gray-100" />
+              <a
+                href={generatedImage}
+                download="gorsel.png"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-violet-600 font-medium hover:underline"
+              >
+                <Download className="w-4 h-4" />
+                Görseli İndir
+              </a>
+              <p className="text-xs text-gray-400">Not: DALL-E görselleri 1 saat sonra silinir. Hemen indirin.</p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── SMS Tab ── */}
       {tab === "sms" && (
         <div className="flex flex-col items-center justify-center py-16 text-center">

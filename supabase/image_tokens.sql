@@ -1,0 +1,1 @@
+ALTER TABLE sellers ADD COLUMN IF NOT EXISTS image_tokens int DEFAULT 10;
