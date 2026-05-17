@@ -67,7 +67,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="text-[10px] text-gray-400 mt-0.5">{shopName ?? "Mağazam"}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Link href="/baglanti" className="p-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors">
+            <Link2 className="w-4 h-4" />
+          </Link>
           <Link href="/ayarlar" className="p-2 text-gray-400 hover:text-gray-600 rounded-lg transition-colors">
             <Settings className="w-4 h-4" />
           </Link>

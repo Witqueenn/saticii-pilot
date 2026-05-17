@@ -135,12 +135,12 @@ export default function LandingPage() {
             >
               14 Gün Ücretsiz Başla <ChevronRight className="w-5 h-5" />
             </Link>
-            <Link
-              href="/giris"
+            <a
+              href="#ozellikler"
               className="border border-gray-200 text-gray-700 px-8 py-4 rounded-xl font-medium hover:bg-gray-50 transition-colors text-base"
             >
-              Demo Gör
-            </Link>
+              Özellikleri Gör
+            </a>
           </div>
           <p className="text-sm text-gray-400">Kredi kartı gerekmez · Kurulum yok · 2 dakikada hazır</p>
 
@@ -175,7 +175,7 @@ export default function LandingPage() {
       </section>
 
       {/* Özellikler */}
-      <section className="px-6 py-20 max-w-5xl mx-auto">
+      <section id="ozellikler" className="px-6 py-20 max-w-5xl mx-auto">
         <div className="text-center mb-14">
           <h2 className="text-3xl font-bold text-gray-900">Her şey tek panelde</h2>
           <p className="text-gray-500 mt-3 text-lg">Tüm pazaryeri operasyonlarını yönetmek için ihtiyacın olan her şey</p>

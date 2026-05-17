@@ -52,7 +52,12 @@ export default function GirisPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">Şifre</label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="block text-sm font-medium text-gray-700">Şifre</label>
+            <Link href="/sifremi-unuttum" className="text-xs text-orange-600 hover:underline">
+              Şifremi unuttum
+            </Link>
+          </div>
           <input
             type="password"
             value={password}
