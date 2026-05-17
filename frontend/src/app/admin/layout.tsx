@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, Users, LogOut, ChevronRight, Mail,
-  BarChart2, MessageSquare, TrendingUp, Activity, Megaphone,
+  BarChart2, MessageSquare, TrendingUp, Activity, Megaphone, Target,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { createClient } from "@/lib/supabase/client";
@@ -18,6 +18,7 @@ const navItems = [
   { href: "/admin/toplu", label: "Toplu İşlemler", icon: Megaphone, exact: false },
   { href: "/admin/loglar", label: "Aktivite Logları", icon: Activity, exact: false },
   { href: "/admin/waitlist", label: "Waitlist", icon: Mail, exact: false },
+  { href: "/admin/leads", label: "BD & Leads", icon: Target, exact: false },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
