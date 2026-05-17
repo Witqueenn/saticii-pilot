@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   MessageSquare, AlertTriangle, Package, RotateCcw,
   TrendingDown, ArrowRight, CheckCircle, Circle,
-  Zap, ShieldCheck, Clock
+  Zap, ShieldCheck, Sparkles, RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -67,24 +67,62 @@ function MiniBarChart({ data, colorClass }: { data: DayCount[]; colorClass: stri
   );
 }
 
-function SetupChecklist({ shopName }: { shopName: string }) {
+// Boş grafik — bağlantı öncesi görsel önizleme
+function GhostBarChart() {
+  const heights = [30, 55, 20, 70, 45, 80, 35];
+  const labels = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+  return (
+    <div className="flex items-end gap-1.5 h-16 select-none">
+      {heights.map((h, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+          <div className="w-full flex flex-col justify-end" style={{ height: "48px" }}>
+            <div
+              className="w-full rounded-t-sm bg-gray-100"
+              style={{ height: `${h}%` }}
+            />
+          </div>
+          <span className="text-[9px] text-gray-300">{labels[i]}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SetupChecklist({
+  shopName,
+  isConnected,
+  hasProducts,
+  hasData,
+}: {
+  shopName: string;
+  isConnected: boolean;
+  hasProducts: boolean;
+  hasData: boolean;
+}) {
   const steps = [
     { label: "Hesabını oluştur", done: true },
-    { label: "Pazaryerini bağla", done: false, href: "/baglanti" },
-    { label: "Ürünlerin otomatik senkronize olsun", done: false },
-    { label: "İlk AI analizini görüntüle", done: false },
+    { label: "Pazaryerini bağla", done: isConnected, href: "/baglanti" },
+    { label: "Ürünleri senkronize et", done: hasProducts },
+    { label: "İlk AI analizini görüntüle", done: hasData },
   ];
+
+  const completedCount = steps.filter((s) => s.done).length;
 
   return (
     <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white">
-      <div className="flex items-start gap-3 mb-5">
-        <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-          <Zap className="w-5 h-5 text-white" />
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Zap className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="font-bold text-lg leading-tight">Hoş geldin, {shopName}!</h3>
+            <p className="text-orange-100 text-sm mt-0.5">İlk analizini almak için mağazanı bağla.</p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-bold text-lg leading-tight">Hoş geldin, {shopName}!</h3>
-          <p className="text-orange-100 text-sm mt-0.5">İlk analizini almak için mağazanı bağla.</p>
-        </div>
+        <span className="text-xs bg-white/20 px-2.5 py-1 rounded-full font-medium whitespace-nowrap">
+          {completedCount}/{steps.length} tamamlandı
+        </span>
       </div>
 
       <div className="space-y-2.5 mb-6">
@@ -92,7 +130,7 @@ function SetupChecklist({ shopName }: { shopName: string }) {
           <div key={i} className="flex items-center gap-3">
             {step.done
               ? <CheckCircle className="w-4 h-4 text-white flex-shrink-0" />
-              : <Circle className="w-4 h-4 text-white/50 flex-shrink-0" />}
+              : <Circle className="w-4 h-4 text-white/40 flex-shrink-0" />}
             <span className={`text-sm ${step.done ? "line-through text-white/60" : "text-white"}`}>
               {step.label}
             </span>
@@ -100,12 +138,41 @@ function SetupChecklist({ shopName }: { shopName: string }) {
         ))}
       </div>
 
-      <Link
-        href="/baglanti"
-        className="inline-flex items-center gap-2 bg-white text-orange-600 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-orange-50 transition-colors"
-      >
-        Trendyol mağazamı bağla <ArrowRight className="w-4 h-4" />
-      </Link>
+      {!isConnected && (
+        <Link
+          href="/baglanti"
+          className="inline-flex items-center gap-2 bg-white text-orange-600 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-orange-50 transition-colors"
+        >
+          Trendyol mağazamı bağla <ArrowRight className="w-4 h-4" />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function DemoAICard() {
+  return (
+    <div className="bg-white rounded-xl border border-dashed border-orange-300 p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center">
+          <Sparkles className="w-4 h-4 text-orange-500" />
+        </div>
+        <p className="text-sm font-semibold text-gray-700">Örnek AI Analizi</p>
+        <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">Önizleme</span>
+      </div>
+      <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed space-y-2">
+        <p>
+          <span className="font-semibold text-gray-900">"Oversize Pamuk T-Shirt"</span> adlı ürün
+          son 7 günde <span className="text-red-600 font-semibold">3 kez</span> beden uyumsuzluğu
+          nedeniyle iade edildi.
+        </p>
+        <p className="text-gray-500 text-xs">
+          Öneri: Ürün açıklamasına santimetre bazlı ölçü tablosu ekle ve
+          "Dar kalıp — bir beden büyük almanızı öneririz" notunu öne çıkar.
+          Bu değişiklik benzer ürünlerde iade oranını ortalama <span className="font-semibold text-green-600">%34</span> düşürüyor.
+        </p>
+      </div>
+      <p className="text-xs text-gray-400">Mağazanı bağladığında gerçek ürünlerin için bu analizler otomatik üretilir.</p>
     </div>
   );
 }
@@ -168,6 +235,9 @@ export default function DashboardPage() {
     load();
   }, []);
 
+  const hasData = summary !== null && (summary.urgentReviews > 0 || summary.lowScoreProducts > 0 || summary.weekReturns > 0);
+  const hasProducts = (summary?.totalProducts ?? 0) > 0;
+
   const stats = [
     {
       label: "Bekleyen Yorum",
@@ -175,13 +245,12 @@ export default function DashboardPage() {
       sub: summary?.urgentReviews
         ? `${summary.urgentReviews} acil yanıt bekliyor`
         : "Yanıt bekleyen yorum yok",
+      emptyHint: "Bağlandığında yanıt bekleyen yorumlar burada görünür",
       icon: MessageSquare,
       color: "text-blue-600",
       bg: "bg-blue-50",
       trend: summary?.urgentReviews ? `${summary.urgentReviews} acil` : null,
-      trendUp: false,
       href: "/yorumlar",
-      emptyHint: "Bağlandığında yanıt bekleyen yorumlar burada görünür",
     },
     {
       label: "Düşük Puanlı Ürün",
@@ -189,13 +258,12 @@ export default function DashboardPage() {
       sub: summary?.lowScoreProducts
         ? "AI açıklama önerisi hazır"
         : "Tüm ürün açıklamaları yeterli",
+      emptyHint: "Bağlandığında düşük puanlı ürünler burada listelenir",
       icon: Package,
       color: "text-orange-600",
       bg: "bg-orange-50",
       trend: summary?.lowScoreProducts ? "Puan < 60" : null,
-      trendUp: false,
       href: "/urunler",
-      emptyHint: "Bağlandığında düşük puanlı ürünler burada listelenir",
     },
     {
       label: "Bu Haftaki İade",
@@ -203,13 +271,12 @@ export default function DashboardPage() {
       sub: summary?.weekReturns
         ? "İade nedenleri analiz edildi"
         : "Bu hafta iade yok",
+      emptyHint: "Bağlandığında iade kalıpları burada analiz edilir",
       icon: RotateCcw,
       color: "text-red-600",
       bg: "bg-red-50",
       trend: null,
-      trendUp: false,
       href: "/iadeler",
-      emptyHint: "Bağlandığında iade kalıpları burada analiz edilir",
     },
     {
       label: "Toplam Ürün",
@@ -217,17 +284,14 @@ export default function DashboardPage() {
       sub: summary?.totalProducts
         ? `${summary.totalProducts} aktif listeleme`
         : "Henüz ürün senkronize edilmedi",
+      emptyHint: "Bağlandığında ürünlerin otomatik senkronize edilir",
       icon: AlertTriangle,
       color: "text-yellow-600",
       bg: "bg-yellow-50",
       trend: null,
-      trendUp: true,
       href: "/urunler",
-      emptyHint: "Bağlandığında ürünlerin otomatik senkronize edilir",
     },
   ];
-
-  const hasData = summary && (summary.urgentReviews > 0 || summary.lowScoreProducts > 0 || summary.weekReturns > 0);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -238,9 +302,14 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Başlangıç Merkezi — sadece bağlantı yoksa */}
+      {/* Başlangıç Merkezi — bağlantı yoksa */}
       {!loading && !isMarketplaceConnected && (
-        <SetupChecklist shopName={shopName} />
+        <SetupChecklist
+          shopName={shopName}
+          isConnected={isMarketplaceConnected}
+          hasProducts={hasProducts}
+          hasData={hasData}
+        />
       )}
 
       {/* KPI Kartları */}
@@ -275,21 +344,28 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* Demo AI Analizi — bağlantı yoksa */}
+      {!loading && !isMarketplaceConnected && <DemoAICard />}
+
       {/* 7 Günlük Aktivite */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="font-semibold text-gray-900 mb-4 text-sm">Son 7 Gün Aktivitesi</h3>
         {loading ? (
           <div className="flex items-end gap-1.5 h-16">
             {[1,2,3,4,5,6,7].map(i => (
-              <div key={i} className="flex-1 animate-pulse bg-gray-100 rounded-t-sm" style={{ height: `${Math.random() * 60 + 20}%` }} />
+              <div key={i} className="flex-1 animate-pulse bg-gray-100 rounded-t-sm" style={{ height: `${20 + i * 8}%` }} />
             ))}
           </div>
         ) : chartData.every(d => d.returns + d.reviews === 0) ? (
-          <div className="text-center py-6">
-            <p className="text-sm text-gray-400">Henüz aktivite verisi yok.</p>
-            {!isMarketplaceConnected && (
-              <p className="text-xs text-gray-400 mt-1">Mağazanı bağladıktan sonra günlük yorum ve iade aktivitesi burada görünür.</p>
-            )}
+          <div className="space-y-3">
+            <div className="relative">
+              <GhostBarChart />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-xs text-gray-400 bg-white/80 px-3 py-1.5 rounded-lg">
+                  Mağazan bağlandığında günlük yorum ve iade aktivitesi burada görünür
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           <MiniBarChart data={chartData} colorClass="bg-orange-400" />
@@ -301,7 +377,7 @@ export default function DashboardPage() {
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900">Öncelikli Aksiyonlar</h3>
           <span className="flex items-center gap-1 text-xs text-gray-400">
-            <Clock className="w-3 h-3" /> Gerçek zamanlı
+            <RefreshCw className="w-3 h-3" /> Senkronizasyon sonrası güncellenir
           </span>
         </div>
         <div className="divide-y divide-gray-100">
@@ -313,26 +389,25 @@ export default function DashboardPage() {
             <div className="p-6 text-center space-y-2">
               <p className="text-sm text-gray-500">Şu an bekleyen aksiyon yok.</p>
               {!isMarketplaceConnected ? (
-                <p className="text-xs text-gray-400">
-                  Mağazanı bağladıktan sonra burada acil yorumlar, düşük puanlı ürünler ve iade riski yüksek ürünler listelenir.
-                </p>
+                <>
+                  <p className="text-xs text-gray-400">
+                    Mağazanı bağladıktan sonra burada acil yorumlar, düşük puanlı ürünler ve iade riski yüksek ürünler listelenir.
+                  </p>
+                  <div className="mt-3 space-y-1.5 text-left max-w-xs mx-auto">
+                    {[
+                      "Yanıt bekleyen acil yorumlar",
+                      "Düşük dönüşüm riski taşıyan ürünler",
+                      "Aynı nedenden gelen iade kalıpları",
+                    ].map((hint, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
+                        {hint}
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
                 <p className="text-xs text-gray-400">Her şey yolunda görünüyor.</p>
-              )}
-              {!isMarketplaceConnected && (
-                <div className="mt-3 space-y-2 text-left max-w-sm mx-auto">
-                  <p className="text-xs font-medium text-gray-500 mb-2">Bağlandığında şunları göreceksin:</p>
-                  {[
-                    "Yanıt bekleyen acil yorumlar",
-                    "Düşük dönüşüm riski taşıyan ürünler",
-                    "Aynı nedenden gelen iade kalıpları",
-                  ].map((hint, i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
-                      {hint}
-                    </div>
-                  ))}
-                </div>
               )}
             </div>
           ) : (
@@ -376,25 +451,30 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Güvenlik + Bağlantı CTA */}
+      {/* Bağlantı CTA — sadece bağlantı yoksa */}
       {!isMarketplaceConnected && !loading && (
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6 text-white">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="font-semibold text-lg">İlk mağazanı bağla</h3>
+              <h3 className="font-semibold text-lg">API bilgilerin hazırsa hemen başla</h3>
               <p className="text-orange-100 text-sm mt-1">
-                Trendyol API bilgilerini girerek gerçek veri analizini başlat. Ortalama kurulum 2 dakika.
+                Ortalama kurulum 2 dakika. Trendyol Partner Panel'den API bilgilerini al, buraya gir.
               </p>
-              <div className="flex items-center gap-1.5 mt-3 text-orange-200 text-xs">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                API bilgilerin şifreli saklanır — yalnızca analiz için kullanılır, sipariş işlemi yapılmaz.
+              <div className="flex items-center gap-3 mt-3 text-orange-200 text-xs">
+                <span className="flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Şifreli saklama
+                </span>
+                <span>·</span>
+                <span>Sipariş işlemi yapılmaz</span>
+                <span>·</span>
+                <span>İstediğin zaman kaldırabilirsin</span>
               </div>
             </div>
             <Link
               href="/baglanti"
               className="bg-white text-orange-600 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-orange-50 transition-colors flex-shrink-0 whitespace-nowrap"
             >
-              Trendyol'u Bağla →
+              Bağlantı ekranına git →
             </Link>
           </div>
         </div>

@@ -137,7 +137,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-gray-800 truncate">{shopName ?? "Mağazam"}</p>
-              <p className="text-[10px] text-gray-400 truncate">{userEmail ?? "—"}</p>
             </div>
             <button
               onClick={handleLogout}
