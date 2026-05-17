@@ -103,9 +103,12 @@ export async function POST(req: NextRequest) {
   const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saticii-pilot.vercel.app";
 
   const resend = getResend();
+  // Resend domain doğrulanana kadar sadece hesap sahibi adresine gönder
+  const toEmail = process.env.RESEND_TO_EMAIL ?? seller.email;
+
   const { error } = await resend.emails.send({
     from: "SatıcıPilot <onboarding@resend.dev>",
-    to: seller.email,
+    to: toEmail,
     subject: `⚡ ${urgentCount} acil yorum yanıt bekliyor — ${seller.shop_name}`,
     html: emailHtml(seller.shop_name, urgentCount, `${dashboardUrl}/yorumlar`),
   });
