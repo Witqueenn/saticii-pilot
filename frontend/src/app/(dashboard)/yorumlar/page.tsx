@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { AlertTriangle, CheckCircle, MessageSquare, Clock, Filter } from "lucide-react";
+import { AlertTriangle, CheckCircle, MessageSquare, Clock, Filter, Sparkles, Loader2, Copy } from "lucide-react";
 import { clsx } from "clsx";
 import { ReviewSkeleton } from "@/components/Skeleton";
 
@@ -39,6 +39,8 @@ export default function YorumlarPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>("tumu");
+  const [drafting, setDrafting] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -62,6 +64,37 @@ export default function YorumlarPage() {
     const supabase = createClient();
     await supabase.from("reviews").update({ is_replied: true }).eq("id", id);
     setReviews((prev) => prev.map((r) => r.id === id ? { ...r, is_replied: true } : r));
+  }
+
+  async function draftReply(r: Review) {
+    setDrafting(r.id);
+    try {
+      const res = await fetch("/api/ai/draft-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          review_id: r.id,
+          product_name: r.product_name,
+          rating: r.rating,
+          comment: r.comment,
+          sentiment: r.sentiment,
+        }),
+      });
+      const { reply } = await res.json();
+      if (reply) {
+        setReviews((prev) =>
+          prev.map((rev) => rev.id === r.id ? { ...rev, suggested_reply: reply } : rev)
+        );
+      }
+    } finally {
+      setDrafting(null);
+    }
+  }
+
+  async function copyToClipboard(id: string, text: string) {
+    await navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
   }
 
   const filtered = reviews.filter((r) => {
@@ -167,28 +200,47 @@ export default function YorumlarPage() {
               <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 leading-relaxed">{r.comment}</p>
 
               {r.suggested_reply && !r.is_replied && (
-                <div className="border border-blue-200 rounded-lg p-4 bg-blue-50 space-y-2">
-                  <p className="text-xs text-blue-600 font-medium flex items-center gap-1">
-                    <MessageSquare className="w-3 h-3" /> AI Cevap Taslağı
+                <div className="border border-orange-200 rounded-lg p-4 bg-orange-50 space-y-2">
+                  <p className="text-xs text-orange-600 font-medium flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> AI Cevap Taslağı
                   </p>
-                  <p className="text-sm text-blue-900 leading-relaxed">{r.suggested_reply}</p>
-                  <div className="flex gap-2 pt-1">
+                  <p className="text-sm text-orange-900 leading-relaxed">{r.suggested_reply}</p>
+                  <div className="flex gap-2 pt-1 flex-wrap">
                     <button
                       onClick={() => markReplied(r.id)}
-                      className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+                      className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-colors"
                     >
-                      Onayla ve Cevapla
+                      ✓ Cevapladım
                     </button>
-                    <button className="text-xs text-blue-600 border border-blue-300 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-colors">
-                      Düzenle
+                    <button
+                      onClick={() => copyToClipboard(r.id, r.suggested_reply!)}
+                      className="text-xs text-orange-600 border border-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-100 transition-colors flex items-center gap-1"
+                    >
+                      <Copy className="w-3 h-3" />
+                      {copied === r.id ? "Kopyalandı!" : "Kopyala"}
+                    </button>
+                    <button
+                      onClick={() => draftReply(r)}
+                      disabled={drafting === r.id}
+                      className="text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1"
+                    >
+                      {drafting === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                      Yeniden Oluştur
                     </button>
                   </div>
                 </div>
               )}
 
               {!r.suggested_reply && !r.is_replied && (
-                <button className="text-xs text-orange-600 hover:text-orange-700 font-medium">
-                  AI ile cevap taslağı oluştur →
+                <button
+                  onClick={() => draftReply(r)}
+                  disabled={drafting === r.id}
+                  className="flex items-center gap-1.5 text-xs text-orange-600 hover:text-orange-700 font-medium disabled:opacity-60 transition-colors"
+                >
+                  {drafting === r.id
+                    ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Oluşturuluyor...</>
+                    : <><Sparkles className="w-3.5 h-3.5" /> AI ile cevap taslağı oluştur</>
+                  }
                 </button>
               )}
             </div>
