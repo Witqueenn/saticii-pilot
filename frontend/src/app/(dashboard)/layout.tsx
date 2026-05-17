@@ -9,14 +9,14 @@ import { useEffect, useState } from "react";
 import OnboardingModal from "@/components/OnboardingModal";
 
 const navItems = [
-  { href: "/genel", label: "Genel Bakış", icon: LayoutDashboard },
-  { href: "/yorumlar", label: "Yorumlar", icon: MessageSquare },
-  { href: "/urunler", label: "Ürünler", icon: Package },
-  { href: "/iadeler", label: "İadeler", icon: RotateCcw },
-  { href: "/rakip", label: "Rakip Analizi", icon: BarChart2 },
-  { href: "/musteri", label: "Müşteri", icon: Users },
-  { href: "/baglanti", label: "Bağlantılar", icon: Link2 },
-  { href: "/ayarlar", label: "Ayarlar", icon: Settings },
+  { href: "/genel", label: "Genel Bakış", icon: LayoutDashboard, pro: false },
+  { href: "/yorumlar", label: "Yorumlar", icon: MessageSquare, pro: false },
+  { href: "/urunler", label: "Ürünler", icon: Package, pro: false },
+  { href: "/iadeler", label: "İadeler", icon: RotateCcw, pro: false },
+  { href: "/rakip", label: "Rakip Analizi", icon: BarChart2, pro: true },
+  { href: "/musteri", label: "Müşteri", icon: Users, pro: true },
+  { href: "/baglanti", label: "Bağlantılar", icon: Link2, pro: false },
+  { href: "/ayarlar", label: "Ayarlar", icon: Settings, pro: false },
 ];
 
 // Mobilde sadece 4 ana item
@@ -121,7 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {navItems.map(({ href, label, icon: Icon }) => {
+          {navItems.map(({ href, label, icon: Icon, pro }) => {
             const active = pathname === href;
             return (
               <Link
@@ -136,6 +136,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <Icon className={clsx("w-4 h-4 flex-shrink-0", active ? "text-orange-500" : "text-gray-400")} />
                 {label}
+                {pro && (
+                  <span className="ml-auto text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                )}
               </Link>
             );
           })}

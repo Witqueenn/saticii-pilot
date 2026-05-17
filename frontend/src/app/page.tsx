@@ -54,44 +54,35 @@ const steps = [
 const plans = [
   {
     name: "Temel",
-    price: "499",
-    originalPrice: "998",
-    desc: "Küçük mağazalar için",
+    price: "Ücretsiz",
+    yearlyNote: null,
+    desc: "Başlamak için",
     features: [
-      "1 mağaza bağlantısı",
       "Yorum merkezi",
-      "İade takibi",
-      "Günlük özet",
+      "İade analizi",
+      "Ürün yönetimi",
+      "Pazaryeri bağlantısı (Trendyol, HB, N11)",
     ],
     highlight: false,
+    cta: "Hemen Başla",
   },
   {
-    name: "Profesyonel",
-    price: "999",
-    originalPrice: "1.998",
+    name: "Pro",
+    price: "599",
+    yearlyNote: "Yıllık ödemede ₺499/ay",
     desc: "Büyüyen satıcılar için",
     features: [
-      "3 mağazaya kadar",
-      "AI cevap taslakları",
-      "Ürün SEO optimizasyonu",
-      "Haftalık performans raporu",
-      "Öncelikli destek",
+      "Temel planın her şeyi",
+      "Rakip Fiyat Analizi",
+      "Müşteri Takibi & QR Form",
+      "AI Yorum Yanıtlama",
+      "Haftalık E-posta Raporu",
+      "WooCommerce & Shopify Bağlantısı",
+      "Instagram Mention Takibi",
+      "Öncelikli Destek",
     ],
     highlight: true,
-  },
-  {
-    name: "Kurumsal",
-    price: "2.499",
-    originalPrice: "4.998",
-    desc: "Çok mağazalı operasyonlar için",
-    features: [
-      "Sınırsız mağaza",
-      "Tüm AI özellikler",
-      "Özel raporlar",
-      "Özel entegrasyon desteği",
-      "7/24 öncelikli destek",
-    ],
-    highlight: false,
+    cta: "14 Gün Ücretsiz Dene",
   },
 ];
 
@@ -463,7 +454,7 @@ export default function LandingPage() {
               Erken erişim: İlk 3 ay tüm planlarda %50 indirim
             </span>
           </p>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {plans.map((p) => (
               <div
                 key={p.name}
@@ -486,10 +477,18 @@ export default function LandingPage() {
                 </div>
                 <div>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black text-gray-900">₺{p.price}</span>
-                    <span className="text-gray-400 text-sm">/ay</span>
+                    {p.price === "Ücretsiz" ? (
+                      <span className="text-4xl font-black text-gray-900">Ücretsiz</span>
+                    ) : (
+                      <>
+                        <span className="text-4xl font-black text-gray-900">₺{p.price}</span>
+                        <span className="text-gray-400 text-sm">/ay</span>
+                      </>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-400 line-through mt-0.5">Normal fiyat: ₺{p.originalPrice}</p>
+                  {p.yearlyNote && (
+                    <p className="text-xs text-green-600 font-medium mt-1">{p.yearlyNote}</p>
+                  )}
                 </div>
                 <ul className="space-y-2.5">
                   {p.features.map((f) => (
@@ -507,7 +506,7 @@ export default function LandingPage() {
                       : "border-2 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
                   }`}
                 >
-                  14 Gün Ücretsiz Başla
+                  {p.cta}
                 </Link>
               </div>
             ))}

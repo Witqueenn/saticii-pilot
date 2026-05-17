@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { TrendingDown, TrendingUp, Minus, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { clsx } from "clsx";
+import ProGate from "@/components/ProGate";
 
 interface CompetitorRow {
   id: string;
@@ -87,12 +88,20 @@ export default function RakipPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
+  const [plan, setPlan] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const { data: seller } = await supabase
+        .from("sellers")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+      setPlan(seller?.plan ?? "temel");
 
       const { data } = await supabase
         .from("competitor_prices")
@@ -145,9 +154,11 @@ export default function RakipPage() {
 
   const filtered = filter === "tumu" ? products : products.filter((p) => p.status === filter);
 
-  if (loading) return (
+  if (loading || plan === null) return (
     <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Yükleniyor...</div>
   );
+
+  if (plan !== "profesyonel") return <ProGate feature="Rakip Fiyat Analizi" />;
 
   return (
     <div className="space-y-6 max-w-4xl">

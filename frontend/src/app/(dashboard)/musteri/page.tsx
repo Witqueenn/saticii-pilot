@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Copy, Download, Star, Mail, CheckCircle, MessageSquare, Users } from "lucide-react";
 import QRCode from "qrcode";
+import ProGate from "@/components/ProGate";
 
 interface Response {
   id: string;
@@ -23,6 +24,7 @@ export default function MusteriPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string>("");
+  const [plan, setPlan] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -30,6 +32,13 @@ export default function MusteriPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      const { data: seller } = await supabase
+        .from("sellers")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+      setPlan(seller?.plan ?? "temel");
 
       // Get or create form
       let { data: form } = await supabase
@@ -93,13 +102,15 @@ export default function MusteriPage() {
   const emailCount = responses.filter((r) => r.email).length;
   const newsletterCount = responses.filter((r) => r.wants_newsletter).length;
 
-  if (loading) {
+  if (loading || plan === null) {
     return (
       <div className="flex items-center justify-center h-48">
         <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
+
+  if (plan !== "profesyonel") return <ProGate feature="Müşteri Takibi & QR Form" />;
 
   return (
     <div className="space-y-6 max-w-3xl">
