@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, CheckCircle, User, CreditCard, Store } from "lucide-react";
+import { Loader2, CheckCircle, User, CreditCard, Store, Bell } from "lucide-react";
 
 const planLabel: Record<string, string> = {
   temel: "Temel",
@@ -26,9 +26,11 @@ export default function AyarlarPage() {
   const [shopName, setShopName] = useState("");
   const [email, setEmail] = useState("");
   const [plan, setPlan] = useState("temel");
+  const [notifyUrgentReviews, setNotifyUrgentReviews] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savingNotif, setSavingNotif] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -41,15 +43,29 @@ export default function AyarlarPage() {
 
       const { data: seller } = await supabase
         .from("sellers")
-        .select("plan")
+        .select("plan, notify_urgent_reviews")
         .eq("id", user.id)
         .single();
 
-      if (seller) setPlan(seller.plan);
+      if (seller) {
+        setPlan(seller.plan);
+        setNotifyUrgentReviews(seller.notify_urgent_reviews ?? true);
+      }
       setLoading(false);
     }
     load();
   }, []);
+
+  async function toggleNotification(value: boolean) {
+    setSavingNotif(true);
+    setNotifyUrgentReviews(value);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("sellers").update({ notify_urgent_reviews: value }).eq("id", user.id);
+    }
+    setSavingNotif(false);
+  }
 
   async function saveShopName(e: React.FormEvent) {
     e.preventDefault();
@@ -128,6 +144,36 @@ export default function AyarlarPage() {
             <p className="text-sm font-medium text-gray-900">{email}</p>
           </div>
           <p className="text-xs text-gray-400">E-posta adresini değiştirmek için destek ekibiyle iletişime geç.</p>
+        </div>
+      </div>
+
+      {/* Bildirimler */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <Bell className="w-4 h-4 text-gray-500" />
+          <h3 className="font-semibold text-gray-900">Bildirimler</h3>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Acil yorum bildirimi</p>
+              <p className="text-xs text-gray-400 mt-0.5">Acil yorum geldiğinde e-posta al</p>
+            </div>
+            <button
+              onClick={() => toggleNotification(!notifyUrgentReviews)}
+              disabled={savingNotif}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+                notifyUrgentReviews ? "bg-orange-500" : "bg-gray-200"
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                notifyUrgentReviews ? "translate-x-5" : "translate-x-0"
+              }`} />
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">
+            Bildirimler {email} adresine gönderilir.
+          </p>
         </div>
       </div>
 
