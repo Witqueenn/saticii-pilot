@@ -84,6 +84,21 @@ const plans = [
     highlight: true,
     cta: "14 Gün Ücretsiz Dene",
   },
+  {
+    name: "Marketing",
+    price: "999",
+    yearlyNote: "Yıllık ödemede ₺799/ay",
+    desc: "Müşteri kazanmak isteyenler için",
+    features: [
+      "Pro planın her şeyi",
+      "Kampanya Planlayıcı",
+      "Müşteri E-posta Kampanyaları",
+      "İndirim Kodu Üretici",
+      "AI Kampanya Önerisi",
+    ],
+    highlight: false,
+    cta: "14 Gün Ücretsiz Dene",
+  },
 ];
 
 const testimonials = [
@@ -454,7 +469,7 @@ export default function LandingPage() {
               Erken erişim: İlk 3 ay tüm planlarda %50 indirim
             </span>
           </p>
-          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6">
             {plans.map((p) => (
               <div
                 key={p.name}

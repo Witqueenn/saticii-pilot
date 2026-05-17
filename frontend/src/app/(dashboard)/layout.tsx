@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut, ShieldCheck, Link2, Settings, BarChart2, Bell, Users } from "lucide-react";
+import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut, ShieldCheck, Link2, Settings, BarChart2, Bell, Users, Megaphone } from "lucide-react";
 import { clsx } from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/iadeler", label: "İadeler", icon: RotateCcw, pro: false },
   { href: "/rakip", label: "Rakip Analizi", icon: BarChart2, pro: true },
   { href: "/musteri", label: "Müşteri", icon: Users, pro: true },
+  { href: "/pazarlama", label: "Pazarlama", icon: Megaphone, pro: true },
   { href: "/baglanti", label: "Bağlantılar", icon: Link2, pro: false },
   { href: "/ayarlar", label: "Ayarlar", icon: Settings, pro: false },
 ];
