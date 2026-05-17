@@ -614,53 +614,14 @@ export default function PazarlamaPage() {
       )}
       {/* ── SMS Tab ── */}
       {tab === "sms" && (
-        <div className="space-y-5">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-            SMS göndermek için Netgsm hesabı ve <strong>NETGSM_USER</strong>, <strong>NETGSM_PASS</strong>, <strong>NETGSM_HEADER</strong> env var'larının Vercel'e eklenmesi gerekir.
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Smartphone className="w-8 h-8 text-gray-400" />
           </div>
-
-          {/* Segment seçici */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
-            <p className="text-sm font-semibold text-gray-700">Hedef Kitle</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {SEGMENTS.map(({ key, label }) => (
-                <button key={key} onClick={() => setSmsSegment(key)}
-                  className={`flex flex-col items-center p-3 rounded-xl border text-center transition-all ${smsSegment === key ? "border-orange-400 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
-                  <span className={`text-lg font-bold ${smsSegment === key ? "text-orange-600" : "text-gray-900"}`}>{smsCounts[key] ?? "—"}</span>
-                  <span className={`text-[11px] mt-0.5 ${smsSegment === key ? "text-orange-600 font-medium" : "text-gray-500"}`}>{label}</span>
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-400">Seçili: <strong className="text-gray-700">{smsCounts[smsSegment] ?? 0} kişi</strong></p>
-          </div>
-
-          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">SMS Mesajı</label>
-              <textarea
-                value={smsMessage}
-                onChange={(e) => setSmsMessage(e.target.value)}
-                rows={4}
-                maxLength={160}
-                placeholder="Mağazamızda bu hafta %20 indirim! Fırsatı kaçırma."
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 resize-none"
-              />
-              <p className="text-xs text-gray-400 text-right mt-1">{smsMessage.length}/160 karakter</p>
-            </div>
-
-            {smsResult && (
-              <div className={`flex items-center gap-2 rounded-xl p-3 text-sm ${smsResult.sent > 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                {smsResult.sent > 0 ? `${smsResult.sent} kişiye SMS gönderildi.` : "Gönderim başarısız."}
-              </div>
-            )}
-
-            <button onClick={sendSms} disabled={sendingSms || !smsMessage || (smsCounts[smsSegment] ?? 0) === 0}
-              className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-600 disabled:opacity-50 transition-colors">
-              {sendingSms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
-              {sendingSms ? "Gönderiliyor..." : `${smsCounts[smsSegment] ?? 0} Kişiye SMS Gönder`}
-            </button>
-          </div>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">SMS Kampanyası Yakında</h3>
+          <p className="text-sm text-gray-500 max-w-sm">
+            Müşterilerine doğrudan SMS ile ulaş. Bu özellik yakında aktif olacak.
+          </p>
         </div>
       )}
 
