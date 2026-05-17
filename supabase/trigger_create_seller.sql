@@ -2,13 +2,14 @@
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.sellers (id, email, shop_name, plan, is_active)
+  insert into public.sellers (id, email, shop_name, plan, is_active, onboarding_done)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data->>'shop_name', 'Mağazam'),
     'temel',
-    true
+    true,
+    false
   )
   on conflict (id) do nothing;
   return new;
