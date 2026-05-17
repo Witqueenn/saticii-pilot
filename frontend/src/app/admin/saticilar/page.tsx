@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Search, CheckCircle, XCircle, ChevronRight } from "lucide-react";
+import { Search, CheckCircle, XCircle, ChevronRight, Link2, Link2Off } from "lucide-react";
 import Link from "next/link";
 import { ListSkeleton } from "@/components/Skeleton";
 
@@ -34,6 +34,7 @@ type FilterStatus = "hepsi" | "aktif" | "pasif";
 
 export default function SaticilarPage() {
   const [sellers, setSellers] = useState<Seller[]>([]);
+  const [connectedIds, setConnectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [filterPlan, setFilterPlan] = useState<FilterPlan>("hepsi");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("hepsi");
@@ -42,11 +43,12 @@ export default function SaticilarPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const { data } = await supabase
-        .from("sellers")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const [{ data }, { data: creds }] = await Promise.all([
+        supabase.from("sellers").select("*").order("created_at", { ascending: false }),
+        supabase.from("marketplace_credentials").select("seller_id"),
+      ]);
       setSellers(data ?? []);
+      setConnectedIds(new Set((creds ?? []).map((c: any) => c.seller_id)));
       setLoading(false);
     }
     load();
@@ -130,7 +132,8 @@ export default function SaticilarPage() {
             <tr>
               <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Mağaza</th>
               <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Plan</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">Kayıt Tarihi</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 hidden md:table-cell">Bağlantı</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 hidden sm:table-cell">Kayıt</th>
               <th className="text-left px-5 py-3 text-xs font-medium text-gray-500">Durum</th>
               <th className="px-5 py-3" />
             </tr>
@@ -158,55 +161,65 @@ export default function SaticilarPage() {
                 <td colSpan={5} className="px-5 py-8 text-center text-gray-400">Satıcı bulunamadı.</td>
               </tr>
             ) : (
-              filtered.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                        {s.shop_name.charAt(0).toUpperCase()}
+              filtered.map((s) => {
+                const isConn = connectedIds.has(s.id);
+                return (
+                  <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {s.shop_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{s.shop_name}</p>
+                          <p className="text-xs text-gray-400">{s.email}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{s.shop_name}</p>
-                        <p className="text-xs text-gray-400">{s.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3">
-                    <select
-                      value={s.plan}
-                      onChange={(e) => changePlan(s, e.target.value)}
-                      className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${planColor[s.plan]}`}
-                    >
-                      {planOptions.map((p) => (
-                        <option key={p} value={p}>{planLabel[p]}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-5 py-3 text-gray-500 text-xs hidden sm:table-cell">
-                    {new Date(s.created_at).toLocaleDateString("tr-TR")}
-                  </td>
-                  <td className="px-5 py-3">
-                    <button
-                      onClick={() => toggleActive(s)}
-                      className="flex items-center gap-1.5 text-xs"
-                    >
-                      {s.is_active ? (
-                        <><CheckCircle className="w-4 h-4 text-green-500" /><span className="text-green-600">Aktif</span></>
-                      ) : (
-                        <><XCircle className="w-4 h-4 text-gray-400" /><span className="text-gray-400">Pasif</span></>
-                      )}
-                    </button>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <Link
-                      href={`/admin/saticilar/${s.id}`}
-                      className="text-gray-400 hover:text-gray-600 transition-colors"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </Link>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-5 py-3">
+                      <select
+                        value={s.plan}
+                        onChange={(e) => changePlan(s, e.target.value)}
+                        className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${planColor[s.plan]}`}
+                      >
+                        {planOptions.map((p) => (
+                          <option key={p} value={p}>{planLabel[p]}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-5 py-3 hidden md:table-cell">
+                      <span className={`flex items-center gap-1 text-xs font-medium ${isConn ? "text-green-600" : "text-gray-400"}`}>
+                        {isConn
+                          ? <><Link2 className="w-3.5 h-3.5" /> Bağlı</>
+                          : <><Link2Off className="w-3.5 h-3.5" /> Bağlantı yok</>}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-gray-500 text-xs hidden sm:table-cell">
+                      {new Date(s.created_at).toLocaleDateString("tr-TR")}
+                    </td>
+                    <td className="px-5 py-3">
+                      <button
+                        onClick={() => toggleActive(s)}
+                        className="flex items-center gap-1.5 text-xs"
+                      >
+                        {s.is_active ? (
+                          <><CheckCircle className="w-4 h-4 text-green-500" /><span className="text-green-600">Aktif</span></>
+                        ) : (
+                          <><XCircle className="w-4 h-4 text-gray-400" /><span className="text-gray-400">Pasif</span></>
+                        )}
+                      </button>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <Link
+                        href={`/admin/saticilar/${s.id}`}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
