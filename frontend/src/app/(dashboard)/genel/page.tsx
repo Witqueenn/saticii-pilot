@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   MessageSquare, AlertTriangle, Package, RotateCcw,
-  TrendingDown, ArrowRight, CheckCircle, Circle,
-  Zap, ShieldCheck, Sparkles, RefreshCw,
+  ArrowRight, CheckCircle, Circle, Zap, ShieldCheck,
+  Sparkles, RefreshCw, TrendingUp, TrendingDown, Minus,
 } from "lucide-react";
 import Link from "next/link";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -17,6 +17,9 @@ interface Summary {
   lowScoreProducts: number;
   weekReturns: number;
   totalProducts: number;
+  lastWeekReturns: number;
+  lastWeekPending: number;
+  lastWeekUrgent: number;
 }
 
 interface DayCount {
@@ -44,30 +47,43 @@ function buildLast7Days(
   return days;
 }
 
-function MiniBarChart({ data, colorClass }: { data: DayCount[]; colorClass: string }) {
-  const max = Math.max(...data.map((d) => d.returns + d.reviews), 1);
+function ActivityChart({ data }: { data: DayCount[] }) {
+  const max = Math.max(...data.map((d) => d.reviews + d.returns), 1);
   return (
-    <div className="flex items-end gap-1.5 h-16">
-      {data.map((d, i) => {
-        const val = d.returns + d.reviews;
-        const pct = (val / max) * 100;
-        return (
+    <div>
+      <div className="flex items-end gap-2 h-20">
+        {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-1">
-            <div className="w-full flex flex-col justify-end" style={{ height: "48px" }}>
+            <div className="w-full flex items-end gap-0.5" style={{ height: "64px" }}>
               <div
-                className={`w-full rounded-t-sm transition-all ${colorClass} ${val === 0 ? "opacity-20" : ""}`}
-                style={{ height: `${Math.max(pct, 4)}%` }}
+                className={`flex-1 rounded-t-sm transition-all ${d.reviews === 0 ? "bg-orange-100" : "bg-orange-400"}`}
+                style={{ height: `${Math.max((d.reviews / max) * 100, d.reviews > 0 ? 6 : 2)}%` }}
+                title={`${d.reviews} yorum`}
+              />
+              <div
+                className={`flex-1 rounded-t-sm transition-all ${d.returns === 0 ? "bg-red-100" : "bg-red-400"}`}
+                style={{ height: `${Math.max((d.returns / max) * 100, d.returns > 0 ? 6 : 2)}%` }}
+                title={`${d.returns} iade`}
               />
             </div>
             <span className="text-[9px] text-gray-400">{d.label}</span>
           </div>
-        );
-      })}
+        ))}
+      </div>
+      <div className="flex items-center gap-4 mt-3">
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 bg-orange-400 rounded-sm" />
+          <span className="text-xs text-gray-500">Yorum</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-2.5 h-2.5 bg-red-400 rounded-sm" />
+          <span className="text-xs text-gray-500">İade</span>
+        </div>
+      </div>
     </div>
   );
 }
 
-// Boş grafik — bağlantı öncesi görsel önizleme
 function GhostBarChart() {
   const heights = [30, 55, 20, 70, 45, 80, 35];
   const labels = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
@@ -76,10 +92,7 @@ function GhostBarChart() {
       {heights.map((h, i) => (
         <div key={i} className="flex-1 flex flex-col items-center gap-1">
           <div className="w-full flex flex-col justify-end" style={{ height: "48px" }}>
-            <div
-              className="w-full rounded-t-sm bg-gray-100"
-              style={{ height: `${h}%` }}
-            />
+            <div className="w-full rounded-t-sm bg-gray-100" style={{ height: `${h}%` }} />
           </div>
           <span className="text-[9px] text-gray-300">{labels[i]}</span>
         </div>
@@ -88,16 +101,22 @@ function GhostBarChart() {
   );
 }
 
-function SetupChecklist({
-  shopName,
-  isConnected,
-  hasProducts,
-  hasData,
-}: {
-  shopName: string;
-  isConnected: boolean;
-  hasProducts: boolean;
-  hasData: boolean;
+function DeltaBadge({ current, previous, lowerIsBetter = false }: { current: number; previous: number; lowerIsBetter?: boolean }) {
+  if (previous === 0 && current === 0) return null;
+  const diff = current - previous;
+  if (diff === 0) return <span className="flex items-center gap-0.5 text-xs text-gray-400"><Minus className="w-3 h-3" />Aynı</span>;
+  const improved = lowerIsBetter ? diff < 0 : diff > 0;
+  const Icon = diff > 0 ? TrendingUp : TrendingDown;
+  return (
+    <span className={`flex items-center gap-0.5 text-xs font-medium ${improved ? "text-green-600" : "text-red-500"}`}>
+      <Icon className="w-3 h-3" />
+      {diff > 0 ? "+" : ""}{diff} geçen haftaya göre
+    </span>
+  );
+}
+
+function SetupChecklist({ shopName, isConnected, hasProducts, hasData }: {
+  shopName: string; isConnected: boolean; hasProducts: boolean; hasData: boolean;
 }) {
   const steps = [
     { label: "Hesabını oluştur", done: true },
@@ -105,9 +124,7 @@ function SetupChecklist({
     { label: "Ürünleri senkronize et", done: hasProducts },
     { label: "İlk AI analizini görüntüle", done: hasData },
   ];
-
   const completedCount = steps.filter((s) => s.done).length;
-
   return (
     <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white">
       <div className="flex items-start justify-between gap-3 mb-5">
@@ -124,25 +141,16 @@ function SetupChecklist({
           {completedCount}/{steps.length} tamamlandı
         </span>
       </div>
-
       <div className="space-y-2.5 mb-6">
         {steps.map((step, i) => (
           <div key={i} className="flex items-center gap-3">
-            {step.done
-              ? <CheckCircle className="w-4 h-4 text-white flex-shrink-0" />
-              : <Circle className="w-4 h-4 text-white/40 flex-shrink-0" />}
-            <span className={`text-sm ${step.done ? "line-through text-white/60" : "text-white"}`}>
-              {step.label}
-            </span>
+            {step.done ? <CheckCircle className="w-4 h-4 text-white flex-shrink-0" /> : <Circle className="w-4 h-4 text-white/40 flex-shrink-0" />}
+            <span className={`text-sm ${step.done ? "line-through text-white/60" : "text-white"}`}>{step.label}</span>
           </div>
         ))}
       </div>
-
       {!isConnected && (
-        <Link
-          href="/baglanti"
-          className="inline-flex items-center gap-2 bg-white text-orange-600 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-orange-50 transition-colors"
-        >
+        <Link href="/baglanti" className="inline-flex items-center gap-2 bg-white text-orange-600 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-orange-50 transition-colors">
           Trendyol mağazamı bağla <ArrowRight className="w-4 h-4" />
         </Link>
       )}
@@ -162,14 +170,12 @@ function DemoAICard() {
       </div>
       <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 leading-relaxed space-y-2">
         <p>
-          <span className="font-semibold text-gray-900">"Oversize Pamuk T-Shirt"</span> adlı ürün
-          son 7 günde <span className="text-red-600 font-semibold">3 kez</span> beden uyumsuzluğu
-          nedeniyle iade edildi.
+          <span className="font-semibold text-gray-900">"Oversize Pamuk T-Shirt"</span> adlı ürün son 7 günde{" "}
+          <span className="text-red-600 font-semibold">3 kez</span> beden uyumsuzluğu nedeniyle iade edildi.
         </p>
         <p className="text-gray-500 text-xs">
-          Öneri: Ürün açıklamasına santimetre bazlı ölçü tablosu ekle ve
-          "Dar kalıp — bir beden büyük almanızı öneririz" notunu öne çıkar.
-          Bu değişiklik benzer ürünlerde iade oranını ortalama <span className="font-semibold text-green-600">%34</span> düşürüyor.
+          Öneri: Ürün açıklamasına santimetre bazlı ölçü tablosu ekle. Bu değişiklik benzer ürünlerde iade oranını ortalama{" "}
+          <span className="font-semibold text-green-600">%34</span> düşürüyor.
         </p>
       </div>
       <p className="text-xs text-gray-400">Mağazanı bağladığında gerçek ürünlerin için bu analizler otomatik üretilir.</p>
@@ -199,34 +205,44 @@ export default function DashboardPage() {
 
       setShopName(user.user_metadata?.shop_name ?? "Mağazam");
 
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
+      const twoWeeksAgo = new Date(now.getTime() - 14 * 86400000).toISOString();
 
       const [
         { data: reviews },
         { data: products },
-        { data: returns },
+        { data: weekReturns },
+        { data: lastWeekReturns },
         { data: allReturns },
         { data: allReviews },
+        { data: lastWeekReviews },
         { data: credentials },
       ] = await Promise.all([
         supabase.from("reviews").select("is_urgent, is_replied").eq("seller_id", user.id),
         supabase.from("products").select("description_score, seo_score").eq("seller_id", user.id),
-        supabase.from("returns").select("returned_at").eq("seller_id", user.id).gte("returned_at", weekAgo.toISOString()),
+        supabase.from("returns").select("returned_at").eq("seller_id", user.id).gte("returned_at", weekAgo),
+        supabase.from("returns").select("id").eq("seller_id", user.id).gte("returned_at", twoWeeksAgo).lt("returned_at", weekAgo),
         supabase.from("returns").select("returned_at").eq("seller_id", user.id),
-        supabase.from("reviews").select("reviewed_at").eq("seller_id", user.id),
+        supabase.from("reviews").select("reviewed_at, is_replied, is_urgent").eq("seller_id", user.id),
+        supabase.from("reviews").select("is_replied, is_urgent").eq("seller_id", user.id).gte("reviewed_at", twoWeeksAgo).lt("reviewed_at", weekAgo),
         supabase.from("marketplace_credentials").select("id").eq("seller_id", user.id).limit(1),
       ]);
 
       setIsMarketplaceConnected((credentials?.length ?? 0) > 0);
 
+      const thisWeekReviews = (allReviews ?? []).filter(r => r.reviewed_at >= weekAgo);
+
       setSummary({
         totalReviews: reviews?.length ?? 0,
-        urgentReviews: reviews?.filter((r) => r.is_urgent).length ?? 0,
+        urgentReviews: reviews?.filter((r) => r.is_urgent && !r.is_replied).length ?? 0,
         pendingReviews: reviews?.filter((r) => !r.is_replied).length ?? 0,
         lowScoreProducts: products?.filter((p) => (p.description_score ?? 100) < 60).length ?? 0,
-        weekReturns: returns?.length ?? 0,
+        weekReturns: weekReturns?.length ?? 0,
         totalProducts: products?.length ?? 0,
+        lastWeekReturns: lastWeekReturns?.length ?? 0,
+        lastWeekPending: lastWeekReviews?.filter(r => !r.is_replied).length ?? 0,
+        lastWeekUrgent: lastWeekReviews?.filter(r => r.is_urgent).length ?? 0,
       });
 
       setChartData(buildLast7Days(allReturns ?? [], allReviews ?? []));
@@ -242,53 +258,45 @@ export default function DashboardPage() {
     {
       label: "Bekleyen Yorum",
       value: summary?.pendingReviews ?? 0,
-      sub: summary?.urgentReviews
-        ? `${summary.urgentReviews} acil yanıt bekliyor`
-        : "Yanıt bekleyen yorum yok",
+      sub: summary?.urgentReviews ? `${summary.urgentReviews} acil yanıt bekliyor` : "Yanıt bekleyen yorum yok",
       emptyHint: "Bağlandığında yanıt bekleyen yorumlar burada görünür",
       icon: MessageSquare,
       color: "text-blue-600",
       bg: "bg-blue-50",
-      trend: summary?.urgentReviews ? `${summary.urgentReviews} acil` : null,
+      delta: summary ? <DeltaBadge current={summary.pendingReviews} previous={summary.lastWeekPending} lowerIsBetter /> : null,
       href: "/yorumlar",
     },
     {
-      label: "Düşük Puanlı Ürün",
-      value: summary?.lowScoreProducts ?? 0,
-      sub: summary?.lowScoreProducts
-        ? "AI açıklama önerisi hazır"
-        : "Tüm ürün açıklamaları yeterli",
-      emptyHint: "Bağlandığında düşük puanlı ürünler burada listelenir",
-      icon: Package,
-      color: "text-orange-600",
-      bg: "bg-orange-50",
-      trend: summary?.lowScoreProducts ? "Puan < 60" : null,
-      href: "/urunler",
+      label: "Acil Yorum",
+      value: summary?.urgentReviews ?? 0,
+      sub: summary?.urgentReviews ? "Hemen yanıtla" : "Acil yorum yok",
+      emptyHint: "Acil yorumlar burada görünür",
+      icon: AlertTriangle,
+      color: "text-red-600",
+      bg: "bg-red-50",
+      delta: summary ? <DeltaBadge current={summary.urgentReviews} previous={summary.lastWeekUrgent} lowerIsBetter /> : null,
+      href: "/yorumlar",
     },
     {
       label: "Bu Haftaki İade",
       value: summary?.weekReturns ?? 0,
-      sub: summary?.weekReturns
-        ? "İade nedenleri analiz edildi"
-        : "Bu hafta iade yok",
+      sub: summary?.weekReturns ? "İade nedenleri analiz edildi" : "Bu hafta iade yok",
       emptyHint: "Bağlandığında iade kalıpları burada analiz edilir",
       icon: RotateCcw,
-      color: "text-red-600",
-      bg: "bg-red-50",
-      trend: null,
+      color: "text-orange-600",
+      bg: "bg-orange-50",
+      delta: summary ? <DeltaBadge current={summary.weekReturns} previous={summary.lastWeekReturns} lowerIsBetter /> : null,
       href: "/iadeler",
     },
     {
-      label: "Toplam Ürün",
-      value: summary?.totalProducts ?? 0,
-      sub: summary?.totalProducts
-        ? `${summary.totalProducts} aktif listeleme`
-        : "Henüz ürün senkronize edilmedi",
-      emptyHint: "Bağlandığında ürünlerin otomatik senkronize edilir",
-      icon: AlertTriangle,
-      color: "text-yellow-600",
-      bg: "bg-yellow-50",
-      trend: null,
+      label: "Düşük Puanlı Ürün",
+      value: summary?.lowScoreProducts ?? 0,
+      sub: summary?.lowScoreProducts ? "AI açıklama önerisi hazır" : "Tüm açıklamalar yeterli",
+      emptyHint: "Bağlandığında düşük puanlı ürünler listelenir",
+      icon: Package,
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+      delta: null,
       href: "/urunler",
     },
   ];
@@ -302,14 +310,8 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Başlangıç Merkezi — bağlantı yoksa */}
       {!loading && !isMarketplaceConnected && (
-        <SetupChecklist
-          shopName={shopName}
-          isConnected={isMarketplaceConnected}
-          hasProducts={hasProducts}
-          hasData={hasData}
-        />
+        <SetupChecklist shopName={shopName} isConnected={isMarketplaceConnected} hasProducts={hasProducts} hasData={hasData} />
       )}
 
       {/* KPI Kartları */}
@@ -328,28 +330,28 @@ export default function DashboardPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-500">{s.label}</p>
               <p className="text-3xl font-bold text-gray-900 mt-1">{s.value}</p>
-              <div className="flex items-center justify-between mt-1">
-                <p className="text-xs text-gray-400">
-                  {s.value === 0 && !isMarketplaceConnected ? s.emptyHint : s.sub}
-                </p>
-                {s.trend && (
-                  <span className="flex items-center gap-0.5 text-xs font-medium text-red-500">
-                    <TrendingDown className="w-3 h-3" />
-                    {s.trend}
-                  </span>
-                )}
-              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {s.value === 0 && !isMarketplaceConnected ? s.emptyHint : s.sub}
+              </p>
+              {s.delta && <div className="mt-1.5">{s.delta}</div>}
             </div>
           </Link>
         ))}
       </div>
 
-      {/* Demo AI Analizi — bağlantı yoksa */}
       {!loading && !isMarketplaceConnected && <DemoAICard />}
 
       {/* 7 Günlük Aktivite */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="font-semibold text-gray-900 mb-4 text-sm">Son 7 Gün Aktivitesi</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900 text-sm">Son 7 Gün Aktivitesi</h3>
+          {!loading && chartData.some(d => d.reviews + d.returns > 0) && (
+            <div className="flex items-center gap-3 text-xs text-gray-400">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 bg-orange-400 rounded-sm inline-block" />Yorum</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 bg-red-400 rounded-sm inline-block" />İade</span>
+            </div>
+          )}
+        </div>
         {loading ? (
           <div className="flex items-end gap-1.5 h-16">
             {[1,2,3,4,5,6,7].map(i => (
@@ -357,22 +359,20 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : chartData.every(d => d.returns + d.reviews === 0) ? (
-          <div className="space-y-3">
-            <div className="relative">
-              <GhostBarChart />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-xs text-gray-400 bg-white/80 px-3 py-1.5 rounded-lg">
-                  Mağazan bağlandığında günlük yorum ve iade aktivitesi burada görünür
-                </p>
-              </div>
+          <div className="relative">
+            <GhostBarChart />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <p className="text-xs text-gray-400 bg-white/80 px-3 py-1.5 rounded-lg">
+                Mağazan bağlandığında günlük aktivite burada görünür
+              </p>
             </div>
           </div>
         ) : (
-          <MiniBarChart data={chartData} colorClass="bg-orange-400" />
+          <ActivityChart data={chartData} />
         )}
       </div>
 
-      {/* Aksiyon Listesi */}
+      {/* Öncelikli Aksiyonlar */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900">Öncelikli Aksiyonlar</h3>
@@ -391,14 +391,10 @@ export default function DashboardPage() {
               {!isMarketplaceConnected ? (
                 <>
                   <p className="text-xs text-gray-400">
-                    Mağazanı bağladıktan sonra burada acil yorumlar, düşük puanlı ürünler ve iade riski yüksek ürünler listelenir.
+                    Mağazanı bağladıktan sonra acil yorumlar, düşük puanlı ürünler ve iade kalıpları burada listelenir.
                   </p>
                   <div className="mt-3 space-y-1.5 text-left max-w-xs mx-auto">
-                    {[
-                      "Yanıt bekleyen acil yorumlar",
-                      "Düşük dönüşüm riski taşıyan ürünler",
-                      "Aynı nedenden gelen iade kalıpları",
-                    ].map((hint, i) => (
+                    {["Yanıt bekleyen acil yorumlar", "Düşük dönüşüm riski taşıyan ürünler", "Aynı nedenden gelen iade kalıpları"].map((hint, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs text-gray-400">
                         <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
                         {hint}
@@ -414,7 +410,7 @@ export default function DashboardPage() {
             <>
               {(summary?.urgentReviews ?? 0) > 0 && (
                 <Link href="/yorumlar" className="flex items-start gap-4 p-4 hover:bg-gray-50 transition-colors group">
-                  <span className="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0 animate-pulse" />
                   <p className="text-sm text-gray-700 flex-1">{summary!.urgentReviews} acil yorum yanıt bekliyor.</p>
                   <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-orange-500 flex-shrink-0 mt-0.5 transition-colors" />
                 </Link>
@@ -451,29 +447,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bağlantı CTA — sadece bağlantı yoksa */}
       {!isMarketplaceConnected && !loading && (
         <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6 text-white">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <h3 className="font-semibold text-lg">API bilgilerin hazırsa hemen başla</h3>
-              <p className="text-orange-100 text-sm mt-1">
-                Ortalama kurulum 2 dakika. Trendyol Partner Panel'den API bilgilerini al, buraya gir.
-              </p>
+              <p className="text-orange-100 text-sm mt-1">Ortalama kurulum 2 dakika. Trendyol Partner Panel'den API bilgilerini al, buraya gir.</p>
               <div className="flex items-center gap-3 mt-3 text-orange-200 text-xs">
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Şifreli saklama
-                </span>
+                <span className="flex items-center gap-1"><ShieldCheck className="w-3.5 h-3.5" /> Şifreli saklama</span>
                 <span>·</span>
                 <span>Sipariş işlemi yapılmaz</span>
-                <span>·</span>
-                <span>İstediğin zaman kaldırabilirsin</span>
               </div>
             </div>
-            <Link
-              href="/baglanti"
-              className="bg-white text-orange-600 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-orange-50 transition-colors flex-shrink-0 whitespace-nowrap"
-            >
+            <Link href="/baglanti" className="bg-white text-orange-600 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-orange-50 transition-colors flex-shrink-0 whitespace-nowrap">
               Bağlantı ekranına git →
             </Link>
           </div>

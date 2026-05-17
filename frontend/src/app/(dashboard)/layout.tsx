@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut, ShieldCheck, Link2, Settings, BarChart2 } from "lucide-react";
+import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut, ShieldCheck, Link2, Settings, BarChart2, Bell } from "lucide-react";
 import { clsx } from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
@@ -28,6 +28,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [shopName, setShopName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [urgentCount, setUrgentCount] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -43,6 +44,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         setIsAdmin(!!adminData);
         if (seller && !seller.onboarding_done) setShowOnboarding(true);
+
+        const { count } = await supabase
+          .from("reviews")
+          .select("*", { count: "exact", head: true })
+          .eq("seller_id", user.id)
+          .eq("is_urgent", true)
+          .eq("is_replied", false);
+        setUrgentCount(count ?? 0);
       }
     });
   }, []);
@@ -88,14 +97,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="hidden md:flex w-60 bg-white border-r border-gray-100 flex-col flex-shrink-0">
         {/* Logo */}
         <div className="px-5 py-5 border-b border-gray-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-sm font-black">S</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="text-white text-sm font-black">S</span>
+              </div>
+              <div>
+                <p className="font-bold text-gray-900 text-sm leading-none">SatıcıPilot</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">AI Operasyon Asistanı</p>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-gray-900 text-sm leading-none">SatıcıPilot</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">AI Operasyon Asistanı</p>
-            </div>
+            <Link href="/yorumlar" className="relative p-1.5 text-gray-400 hover:text-orange-500 transition-colors" title="Acil yorumlar">
+              <Bell className="w-4 h-4" />
+              {urgentCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {urgentCount > 9 ? "9+" : urgentCount}
+                </span>
+              )}
+            </Link>
           </div>
         </div>
 
