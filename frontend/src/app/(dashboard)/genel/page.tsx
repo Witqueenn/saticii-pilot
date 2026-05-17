@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { MessageSquare, AlertTriangle, Package, RotateCcw, TrendingDown, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { CardSkeleton } from "@/components/Skeleton";
+import { CardSkeleton, Skeleton } from "@/components/Skeleton";
 
 interface Summary {
   totalReviews: number;
@@ -15,8 +15,57 @@ interface Summary {
   totalProducts: number;
 }
 
+interface DayCount {
+  label: string;
+  returns: number;
+  reviews: number;
+}
+
+function buildLast7Days(
+  returns: { returned_at: string }[],
+  reviews: { reviewed_at?: string; created_at?: string }[]
+): DayCount[] {
+  const days: DayCount[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split("T")[0];
+    const label = d.toLocaleDateString("tr-TR", { weekday: "short" });
+    days.push({
+      label,
+      returns: returns.filter((r) => r.returned_at?.startsWith(key)).length,
+      reviews: reviews.filter((r) => (r.reviewed_at ?? r.created_at ?? "").startsWith(key)).length,
+    });
+  }
+  return days;
+}
+
+function MiniBarChart({ data, colorClass }: { data: DayCount[]; colorClass: string }) {
+  const max = Math.max(...data.map((d) => d.returns + d.reviews), 1);
+  return (
+    <div className="flex items-end gap-1.5 h-16">
+      {data.map((d, i) => {
+        const val = d.returns + d.reviews;
+        const pct = (val / max) * 100;
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <div className="w-full flex flex-col justify-end" style={{ height: "48px" }}>
+              <div
+                className={`w-full rounded-t-sm transition-all ${colorClass} ${val === 0 ? "opacity-20" : ""}`}
+                style={{ height: `${Math.max(pct, 4)}%` }}
+              />
+            </div>
+            <span className="text-[9px] text-gray-400">{d.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [chartData, setChartData] = useState<DayCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [shopName, setShopName] = useState("");
 
@@ -35,10 +84,14 @@ export default function DashboardPage() {
         { data: reviews },
         { data: products },
         { data: returns },
+        { data: allReturns },
+        { data: allReviews },
       ] = await Promise.all([
         supabase.from("reviews").select("is_urgent, is_replied").eq("seller_id", user.id),
         supabase.from("products").select("description_score, seo_score").eq("seller_id", user.id),
         supabase.from("returns").select("returned_at").eq("seller_id", user.id).gte("returned_at", weekAgo.toISOString()),
+        supabase.from("returns").select("returned_at").eq("seller_id", user.id),
+        supabase.from("reviews").select("reviewed_at").eq("seller_id", user.id),
       ]);
 
       setSummary({
@@ -49,6 +102,8 @@ export default function DashboardPage() {
         weekReturns: returns?.length ?? 0,
         totalProducts: products?.length ?? 0,
       });
+
+      setChartData(buildLast7Days(allReturns ?? [], allReviews ?? []));
       setLoading(false);
     }
     load();
@@ -104,17 +159,16 @@ export default function DashboardPage() {
   const hasData = summary && (summary.urgentReviews > 0 || summary.lowScoreProducts > 0 || summary.weekReturns > 0);
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="space-y-6 max-w-4xl">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Günlük Özet</h2>
         <p className="text-gray-500 mt-1">Hoş geldin, {shopName}</p>
       </div>
 
+      {/* KPI Kartları */}
       <div className="grid grid-cols-2 gap-4">
         {loading ? (
-          <>
-            <CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton />
-          </>
+          <><CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton /></>
         ) : stats.map((s) => (
           <Link
             key={s.label}
@@ -126,14 +180,12 @@ export default function DashboardPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm text-gray-500">{s.label}</p>
-              <p className="text-3xl font-bold text-gray-900 mt-1">
-                {loading ? "—" : s.value}
-              </p>
+              <p className="text-3xl font-bold text-gray-900 mt-1">{s.value}</p>
               <div className="flex items-center justify-between mt-1">
                 <p className="text-xs text-gray-400">{s.sub}</p>
                 {s.trend && (
-                  <span className={`flex items-center gap-0.5 text-xs font-medium ${s.trendUp ? "text-green-600" : "text-red-500"}`}>
-                    {s.trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  <span className="flex items-center gap-0.5 text-xs font-medium text-red-500">
+                    <TrendingDown className="w-3 h-3" />
                     {s.trend}
                   </span>
                 )}
@@ -143,7 +195,23 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Aksiyon listesi */}
+      {/* 7 Günlük Aktivite */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 className="font-semibold text-gray-900 mb-4 text-sm">Son 7 Gün Aktivitesi</h3>
+        {loading ? (
+          <div className="flex items-end gap-1.5 h-16">
+            {[1,2,3,4,5,6,7].map(i => (
+              <div key={i} className="flex-1 animate-pulse bg-gray-100 rounded-t-sm" style={{ height: `${Math.random() * 60 + 20}%` }} />
+            ))}
+          </div>
+        ) : chartData.every(d => d.returns + d.reviews === 0) ? (
+          <p className="text-sm text-gray-400 text-center py-6">Henüz veri yok.</p>
+        ) : (
+          <MiniBarChart data={chartData} colorClass="bg-orange-400" />
+        )}
+      </div>
+
+      {/* Aksiyon Listesi */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900">Öncelikli Aksiyonlar</h3>
@@ -161,27 +229,21 @@ export default function DashboardPage() {
               {(summary?.urgentReviews ?? 0) > 0 && (
                 <Link href="/yorumlar" className="flex items-start gap-4 p-4 hover:bg-gray-50 transition-colors group">
                   <span className="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
-                  <p className="text-sm text-gray-700 flex-1">
-                    {summary!.urgentReviews} acil yorum cevap bekliyor.
-                  </p>
+                  <p className="text-sm text-gray-700 flex-1">{summary!.urgentReviews} acil yorum cevap bekliyor.</p>
                   <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-orange-500 flex-shrink-0 mt-0.5 transition-colors" />
                 </Link>
               )}
               {(summary?.lowScoreProducts ?? 0) > 0 && (
                 <Link href="/urunler" className="flex items-start gap-4 p-4 hover:bg-gray-50 transition-colors group">
                   <span className="w-2 h-2 rounded-full bg-orange-500 mt-1.5 flex-shrink-0" />
-                  <p className="text-sm text-gray-700 flex-1">
-                    {summary!.lowScoreProducts} ürünün açıklama puanı 60'ın altında — iyileştirme önerisi hazır.
-                  </p>
+                  <p className="text-sm text-gray-700 flex-1">{summary!.lowScoreProducts} ürünün açıklama puanı 60'ın altında.</p>
                   <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-orange-500 flex-shrink-0 mt-0.5 transition-colors" />
                 </Link>
               )}
               {(summary?.weekReturns ?? 0) > 0 && (
                 <Link href="/iadeler" className="flex items-start gap-4 p-4 hover:bg-gray-50 transition-colors group">
                   <span className="w-2 h-2 rounded-full bg-yellow-500 mt-1.5 flex-shrink-0" />
-                  <p className="text-sm text-gray-700 flex-1">
-                    Bu hafta {summary!.weekReturns} iade geldi — kalıp analizi için incele.
-                  </p>
+                  <p className="text-sm text-gray-700 flex-1">Bu hafta {summary!.weekReturns} iade — kalıp analizi için incele.</p>
                   <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-orange-500 flex-shrink-0 mt-0.5 transition-colors" />
                 </Link>
               )}
@@ -190,6 +252,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Mağaza bağlama banner */}
       <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
@@ -198,9 +261,12 @@ export default function DashboardPage() {
               Trendyol, Hepsiburada, N11 ve daha fazlası. API bilgilerini girerek gerçek veri analizini başlat.
             </p>
           </div>
-          <button className="bg-white text-orange-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors flex-shrink-0 ml-4">
+          <Link
+            href="/baglanti"
+            className="bg-white text-orange-600 font-medium text-sm px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors flex-shrink-0 ml-4"
+          >
             Bağla →
-          </button>
+          </Link>
         </div>
       </div>
     </div>
