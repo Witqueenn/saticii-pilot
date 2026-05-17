@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Send, Tag, Calendar, Trash2, Loader2, CheckCircle,
   Megaphone, Mail, Sparkles, Copy, Hash, Zap, ToggleLeft, ToggleRight,
+  BarChart2, Smartphone, MousePointerClick, Eye,
 } from "lucide-react";
 import ProGate from "@/components/ProGate";
 
@@ -84,7 +85,7 @@ export default function PazarlamaPage() {
   const [plan, setPlan] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [tab, setTab] = useState<"kampanya" | "email" | "otomasyon">("kampanya");
+  const [tab, setTab] = useState<"kampanya" | "email" | "otomasyon" | "performans" | "sms">("kampanya");
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [showAutoForm, setShowAutoForm] = useState(false);
   const [savingAuto, setSavingAuto] = useState(false);
@@ -107,6 +108,17 @@ export default function PazarlamaPage() {
 
   // Email form
   const [emailForm, setEmailForm] = useState({ subject: "", body: "", discount_code: "", product: "", tone: "samimi" });
+
+  // SMS
+  const [smsMessage, setSmsMessage] = useState("");
+  const [smsSegment, setSmsSegment] = useState("all");
+  const [smsCounts, setSmsCounts] = useState<Record<string, number>>({});
+  const [sendingSms, setSendingSms] = useState(false);
+  const [smsResult, setSmsResult] = useState<{ sent: number; total: number } | null>(null);
+
+  // Performans
+  interface EmailSend { campaign_label: string; subject: string; segment: string; opened: boolean; clicked: boolean; }
+  const [emailSends, setEmailSends] = useState<EmailSend[]>([]);
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ sent: number; failed: number } | null>(null);
 
@@ -155,6 +167,24 @@ export default function PazarlamaPage() {
       setCampaigns(cList ?? []);
       setAutomations(aList ?? []);
       loadSegmentCounts();
+
+      // SMS counts
+      const smsCountsData: Record<string, number> = {};
+      await Promise.all(SEGMENTS.map(async ({ key }) => {
+        const res = await fetch(`/api/pazarlama/sms?segment=${key}`);
+        const d = await res.json();
+        smsCountsData[key] = d.count ?? 0;
+      }));
+      setSmsCounts(smsCountsData);
+
+      // Performans: son 50 gönderim
+      const { data: sends } = await supabase
+        .from("email_sends")
+        .select("campaign_label, subject, segment, opened, clicked")
+        .eq("seller_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      setEmailSends(sends ?? []);
     }
     load();
   }, [loadSegmentCounts]);
@@ -242,6 +272,20 @@ export default function PazarlamaPage() {
     setGeneratingAI(false);
   }
 
+  async function sendSms() {
+    setSendingSms(true);
+    setSmsResult(null);
+    const res = await fetch("/api/pazarlama/sms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: smsMessage, segment: smsSegment }),
+    });
+    const data = await res.json();
+    setSmsResult(data);
+    setSendingSms(false);
+    if (data.sent > 0) setSmsMessage("");
+  }
+
   async function sendEmail() {
     setSending(true);
     setSendResult(null);
@@ -282,7 +326,9 @@ export default function PazarlamaPage() {
         {[
           { key: "kampanya", label: "Kampanyalar", icon: Megaphone },
           { key: "email", label: "E-posta", icon: Mail },
+          { key: "sms", label: "SMS", icon: Smartphone },
           { key: "otomasyon", label: "Otomasyonlar", icon: Zap },
+          { key: "performans", label: "Performans", icon: BarChart2 },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -566,6 +612,129 @@ export default function PazarlamaPage() {
           </div>
         </div>
       )}
+      {/* ── SMS Tab ── */}
+      {tab === "sms" && (
+        <div className="space-y-5">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+            SMS göndermek için Netgsm hesabı ve <strong>NETGSM_USER</strong>, <strong>NETGSM_PASS</strong>, <strong>NETGSM_HEADER</strong> env var'larının Vercel'e eklenmesi gerekir.
+          </div>
+
+          {/* Segment seçici */}
+          <div className="bg-white border border-gray-200 rounded-2xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-700">Hedef Kitle</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {SEGMENTS.map(({ key, label }) => (
+                <button key={key} onClick={() => setSmsSegment(key)}
+                  className={`flex flex-col items-center p-3 rounded-xl border text-center transition-all ${smsSegment === key ? "border-orange-400 bg-orange-50" : "border-gray-200 hover:border-gray-300"}`}>
+                  <span className={`text-lg font-bold ${smsSegment === key ? "text-orange-600" : "text-gray-900"}`}>{smsCounts[key] ?? "—"}</span>
+                  <span className={`text-[11px] mt-0.5 ${smsSegment === key ? "text-orange-600 font-medium" : "text-gray-500"}`}>{label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400">Seçili: <strong className="text-gray-700">{smsCounts[smsSegment] ?? 0} kişi</strong></p>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">SMS Mesajı</label>
+              <textarea
+                value={smsMessage}
+                onChange={(e) => setSmsMessage(e.target.value)}
+                rows={4}
+                maxLength={160}
+                placeholder="Mağazamızda bu hafta %20 indirim! Fırsatı kaçırma."
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 resize-none"
+              />
+              <p className="text-xs text-gray-400 text-right mt-1">{smsMessage.length}/160 karakter</p>
+            </div>
+
+            {smsResult && (
+              <div className={`flex items-center gap-2 rounded-xl p-3 text-sm ${smsResult.sent > 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                {smsResult.sent > 0 ? `${smsResult.sent} kişiye SMS gönderildi.` : "Gönderim başarısız."}
+              </div>
+            )}
+
+            <button onClick={sendSms} disabled={sendingSms || !smsMessage || (smsCounts[smsSegment] ?? 0) === 0}
+              className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-orange-600 disabled:opacity-50 transition-colors">
+              {sendingSms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Smartphone className="w-4 h-4" />}
+              {sendingSms ? "Gönderiliyor..." : `${smsCounts[smsSegment] ?? 0} Kişiye SMS Gönder`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Performans Tab ── */}
+      {tab === "performans" && (() => {
+        // Kampanya bazlı grupla
+        const groups: Record<string, { label: string; segment: string; total: number; opened: number; clicked: number }> = {};
+        for (const s of emailSends) {
+          const key = s.campaign_label ?? s.subject;
+          if (!groups[key]) groups[key] = { label: key, segment: s.segment, total: 0, opened: 0, clicked: 0 };
+          groups[key].total++;
+          if (s.opened) groups[key].opened++;
+          if (s.clicked) groups[key].clicked++;
+        }
+        const rows = Object.values(groups);
+
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">Her gönderilen kampanyanın açılma ve tıklanma oranı. Resend webhook kurulumu gerekir.</p>
+
+            {rows.length === 0 ? (
+              <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-10 text-center">
+                <BarChart2 className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm font-medium">Henüz kampanya verisi yok</p>
+                <p className="text-gray-400 text-xs mt-1">E-posta gönderdikten sonra istatistikler burada görünür.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {rows.map((r) => {
+                  const openRate = r.total > 0 ? Math.round((r.opened / r.total) * 100) : 0;
+                  const clickRate = r.total > 0 ? Math.round((r.clicked / r.total) * 100) : 0;
+                  return (
+                    <div key={r.label} className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="font-semibold text-gray-900 text-sm">{r.label}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{r.segment} segmenti · {r.total} kişi</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-blue-50 rounded-xl p-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <Eye className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="text-xs font-medium text-blue-700">Açılma Oranı</span>
+                          </div>
+                          <p className="text-2xl font-bold text-blue-700">%{openRate}</p>
+                          <p className="text-xs text-blue-500">{r.opened} / {r.total}</p>
+                        </div>
+                        <div className="bg-purple-50 rounded-xl p-3">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <MousePointerClick className="w-3.5 h-3.5 text-purple-500" />
+                            <span className="text-xs font-medium text-purple-700">Tıklanma Oranı</span>
+                          </div>
+                          <p className="text-2xl font-bold text-purple-700">%{clickRate}</p>
+                          <p className="text-xs text-purple-500">{r.clicked} / {r.total}</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-xs text-gray-500 space-y-1">
+              <p className="font-semibold text-gray-700">Webhook kurulumu</p>
+              <p>1. Resend dashboard → Webhooks → Add endpoint</p>
+              <p>2. URL: <code className="bg-gray-100 px-1 rounded">https://saticii-pilot.vercel.app/api/webhooks/resend</code></p>
+              <p>3. Events: <code className="bg-gray-100 px-1 rounded">email.opened</code>, <code className="bg-gray-100 px-1 rounded">email.clicked</code></p>
+              <p>4. Signing secret'ı Vercel'de <code className="bg-gray-100 px-1 rounded">RESEND_WEBHOOK_SECRET</code> olarak ekle</p>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* ── Otomasyonlar Tab ── */}
       {tab === "otomasyon" && (
         <div className="space-y-4">

@@ -60,16 +60,27 @@ export async function POST(req: NextRequest) {
 
   let sent = 0;
   let failed = 0;
+  const campaignLabel = `${subject} — ${new Date().toLocaleDateString("tr-TR")}`;
 
   for (const email of unique) {
     try {
-      await resend.emails.send({
+      const result = await resend.emails.send({
         from: "SatıcıPilot <noreply@saticipilot.com>",
         to: email,
         subject,
         html: htmlBody,
       });
       sent++;
+      if (result.data?.id) {
+        await serviceSupabase.from("email_sends").insert({
+          seller_id: user.id,
+          resend_id: result.data.id,
+          recipient_email: email,
+          subject,
+          segment: segment ?? "all",
+          campaign_label: campaignLabel,
+        });
+      }
     } catch {
       failed++;
     }

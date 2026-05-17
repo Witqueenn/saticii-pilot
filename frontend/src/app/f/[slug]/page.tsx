@@ -20,6 +20,7 @@ export default function CustomerFormPage() {
   const [hovered, setHovered] = useState(0);
   const [comment, setComment] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [newsletter, setNewsletter] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
@@ -54,7 +55,7 @@ export default function CustomerFormPage() {
     await fetch("/api/forms/submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ slug, rating, comment, email, wants_newsletter: newsletter, product_ref: productRef }),
+      body: JSON.stringify({ slug, rating, comment, email, phone, wants_newsletter: newsletter, product_ref: productRef }),
     });
 
     setDone(true);
@@ -164,6 +165,18 @@ export default function CustomerFormPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="ornek@mail.com"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+            />
+          </div>
+
+          {/* Phone */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefon <span className="text-gray-400 font-normal">(isteğe bağlı)</span></label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="05xxxxxxxxx"
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
             />
           </div>

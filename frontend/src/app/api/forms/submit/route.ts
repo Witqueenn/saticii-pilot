@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const { slug, rating, comment, email, wants_newsletter, product_ref } = await req.json();
+  const { slug, rating, comment, email, phone, wants_newsletter, product_ref } = await req.json();
 
   if (!slug || !rating) {
     return NextResponse.json({ error: "Eksik bilgi" }, { status: 400 });
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     rating,
     comment: comment ?? null,
     email: email ?? null,
+    phone: phone ?? null,
     wants_newsletter: !!wants_newsletter,
   });
 
