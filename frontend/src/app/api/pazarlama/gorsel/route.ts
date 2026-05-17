@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import OpenAI from "openai";
+import Replicate from "replicate";
 
 const STYLE_PROMPTS: Record<string, string> = {
   beyaz: "professional product photo on a clean white background, soft shadows, studio lighting, e-commerce style, high resolution",
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   const { data: seller } = await serviceSupabase
     .from("sellers")
-    .select("image_tokens, shop_name")
+    .select("image_tokens")
     .eq("id", user.id)
     .single();
 
@@ -34,20 +34,21 @@ export async function POST(req: NextRequest) {
   if (!product || !style) return NextResponse.json({ error: "Eksik bilgi" }, { status: 400 });
 
   const styleDesc = STYLE_PROMPTS[style] ?? STYLE_PROMPTS.beyaz;
-  const prompt = `${product}, ${styleDesc}. Do not include any text or watermarks in the image.`;
+  const prompt = `${product}, ${styleDesc}. No text, no watermarks.`;
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const replicate = new Replicate({ auth: process.env.REPLICATE_API_TOKEN });
 
   let imageUrl: string;
   try {
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt,
-      n: 1,
-      size: "1024x1024",
-      quality: "standard",
+    const output = await replicate.run("black-forest-labs/flux-1.1-pro", {
+      input: {
+        prompt,
+        aspect_ratio: "1:1",
+        output_format: "webp",
+        output_quality: 90,
+      },
     });
-    imageUrl = response.data?.[0]?.url ?? "";
+    imageUrl = typeof output === "string" ? output : (output as string[])?.[0] ?? "";
     if (!imageUrl) throw new Error("No image URL");
   } catch {
     return NextResponse.json({ error: "Görsel oluşturulamadı" }, { status: 500 });
