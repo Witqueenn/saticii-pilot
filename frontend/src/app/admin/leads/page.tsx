@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { Plus, Target, ExternalLink, ChevronDown, X, Check, Loader2 } from "lucide-react";
 
 interface Lead {
@@ -49,12 +48,10 @@ export default function LeadsPage() {
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const supabase = createClient();
-
   async function load() {
-    const { data, error } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
-    if (error) console.error("leads fetch error:", error);
-    setLeads(data ?? []);
+    const res = await fetch("/api/admin/leads");
+    const data = await res.json();
+    setLeads(Array.isArray(data) ? data : []);
     setLoading(false);
   }
 
@@ -85,12 +82,11 @@ export default function LeadsPage() {
       status: form.status,
       source: form.source || null,
       notes: form.notes || null,
-      updated_at: new Date().toISOString(),
     };
     if (editLead) {
-      await supabase.from("leads").update(payload).eq("id", editLead.id);
+      await fetch("/api/admin/leads", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editLead.id, ...payload }) });
     } else {
-      await supabase.from("leads").insert(payload);
+      await fetch("/api/admin/leads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     }
     setSaving(false);
     setShowModal(false);
@@ -98,13 +94,13 @@ export default function LeadsPage() {
   }
 
   async function updateStatus(id: string, status: string) {
-    await supabase.from("leads").update({ status, updated_at: new Date().toISOString() }).eq("id", id);
+    await fetch("/api/admin/leads", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
     setLeads((prev) => prev.map((l) => l.id === id ? { ...l, status } : l));
   }
 
   async function deleteLead(id: string) {
     if (!confirm("Bu lead'i silmek istediğine emin misin?")) return;
-    await supabase.from("leads").delete().eq("id", id);
+    await fetch("/api/admin/leads", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
     setLeads((prev) => prev.filter((l) => l.id !== id));
   }
 
