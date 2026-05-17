@@ -4,37 +4,96 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { CheckCircle, ExternalLink, ChevronDown, ChevronUp, Trash2, Loader2 } from "lucide-react";
 
-const platforms = [
+const sections = [
   {
-    id: "trendyol",
-    name: "Trendyol",
-    fields: [
-      { key: "api_key", label: "API Key", placeholder: "Trendyol API Key" },
-      { key: "api_secret", label: "API Secret", placeholder: "Trendyol API Secret" },
-      { key: "supplier_id", label: "Supplier ID", placeholder: "Mağaza ID" },
+    title: "Pazaryerleri",
+    platforms: [
+      {
+        id: "trendyol",
+        name: "Trendyol",
+        initials: "TY",
+        color: "bg-orange-100 text-orange-700",
+        fields: [
+          { key: "api_key", label: "API Key", placeholder: "Trendyol API Key" },
+          { key: "api_secret", label: "API Secret", placeholder: "Trendyol API Secret" },
+          { key: "supplier_id", label: "Supplier ID", placeholder: "Mağaza ID" },
+        ],
+        guide: "https://partner.trendyol.com",
+        guideLabel: "Trendyol Partner Panel",
+      },
+      {
+        id: "hepsiburada",
+        name: "Hepsiburada",
+        initials: "HB",
+        color: "bg-blue-100 text-blue-700",
+        fields: [
+          { key: "api_key", label: "Username", placeholder: "Hepsiburada kullanıcı adı" },
+          { key: "api_secret", label: "Password", placeholder: "Hepsiburada şifresi" },
+        ],
+        guide: "https://merchant.hepsiburada.com",
+        guideLabel: "Hepsiburada Merchant Panel",
+      },
+      {
+        id: "n11",
+        name: "N11",
+        initials: "N11",
+        color: "bg-purple-100 text-purple-700",
+        fields: [
+          { key: "api_key", label: "API Key", placeholder: "N11 API Key" },
+          { key: "api_secret", label: "API Secret", placeholder: "N11 API Secret" },
+        ],
+        guide: "https://www.n11.com/magaza",
+        guideLabel: "N11 Mağaza Paneli",
+      },
     ],
-    guide: "https://partner.trendyol.com",
-    guideLabel: "Trendyol Partner Panel",
   },
   {
-    id: "hepsiburada",
-    name: "Hepsiburada",
-    fields: [
-      { key: "api_key", label: "Username", placeholder: "Hepsiburada kullanıcı adı" },
-      { key: "api_secret", label: "Password", placeholder: "Hepsiburada şifresi" },
+    title: "Web Siteleri",
+    platforms: [
+      {
+        id: "woocommerce",
+        name: "WooCommerce",
+        initials: "WC",
+        color: "bg-indigo-100 text-indigo-700",
+        fields: [
+          { key: "store_url", label: "Mağaza URL", placeholder: "https://magaza.com" },
+          { key: "api_key", label: "Consumer Key", placeholder: "ck_xxxxxxxxxxxx" },
+          { key: "api_secret", label: "Consumer Secret", placeholder: "cs_xxxxxxxxxxxx" },
+        ],
+        guide: "https://woo.com/document/woocommerce-rest-api/",
+        guideLabel: "WooCommerce API Dokümantasyonu",
+      },
+      {
+        id: "shopify",
+        name: "Shopify",
+        initials: "SH",
+        color: "bg-green-100 text-green-700",
+        fields: [
+          { key: "store_url", label: "Mağaza URL", placeholder: "magaza.myshopify.com" },
+          { key: "api_key", label: "API Key", placeholder: "Shopify Admin API Key" },
+          { key: "api_secret", label: "Access Token", placeholder: "shpat_xxxxxxxxxxxx" },
+        ],
+        guide: "https://shopify.dev/docs/api/admin-rest",
+        guideLabel: "Shopify Admin API",
+      },
     ],
-    guide: "https://merchant.hepsiburada.com",
-    guideLabel: "Hepsiburada Merchant Panel",
   },
   {
-    id: "n11",
-    name: "N11",
-    fields: [
-      { key: "api_key", label: "API Key", placeholder: "N11 API Key" },
-      { key: "api_secret", label: "API Secret", placeholder: "N11 API Secret" },
+    title: "Sosyal Medya",
+    platforms: [
+      {
+        id: "instagram",
+        name: "Instagram",
+        initials: "IG",
+        color: "bg-pink-100 text-pink-700",
+        fields: [
+          { key: "api_key", label: "Access Token", placeholder: "Instagram Graph API Access Token" },
+          { key: "supplier_id", label: "Business Account ID", placeholder: "Instagram işletme hesap ID" },
+        ],
+        guide: "https://developers.facebook.com/docs/instagram-api/",
+        guideLabel: "Instagram Graph API Dokümantasyonu",
+      },
     ],
-    guide: "https://www.n11.com/magaza",
-    guideLabel: "N11 Mağaza Paneli",
   },
 ];
 
@@ -90,6 +149,7 @@ export default function BaglantiPage() {
       api_key: vals.api_key ?? "",
       api_secret: vals.api_secret ?? "",
       supplier_id: vals.supplier_id ?? null,
+      store_url: vals.store_url ?? null,
     }, { onConflict: "seller_id,marketplace" });
 
     const { data } = await supabase
@@ -115,14 +175,16 @@ export default function BaglantiPage() {
     setDeleting(null);
   }
 
+  const totalConnected = connected.length;
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Pazaryeri Bağlantıları</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Bağlantılar</h2>
         <p className="text-gray-500 mt-1">
-          {connected.length > 0
-            ? `${connected.length} pazaryeri bağlı`
-            : "Henüz bağlı pazaryeri yok"}
+          {totalConnected > 0
+            ? `${totalConnected} platform bağlı`
+            : "Henüz bağlı platform yok"}
         </p>
       </div>
 
@@ -130,82 +192,87 @@ export default function BaglantiPage() {
         API bilgilerin şifreli olarak saklanır ve yalnızca veri çekme amacıyla kullanılır.
       </div>
 
-      <div className="space-y-3">
-        {platforms.map((p) => {
-          const conn = isConnected(p.id);
-          return (
-            <div
-              key={p.id}
-              className={`bg-white rounded-xl border overflow-hidden transition-colors ${conn ? "border-green-300" : "border-gray-200"}`}
-            >
-              <button
-                onClick={() => setOpen(open === p.id ? null : p.id)}
-                className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+      {sections.map((section) => (
+        <div key={section.title} className="space-y-3">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-1">
+            {section.title}
+          </h3>
+          {section.platforms.map((p) => {
+            const conn = isConnected(p.id);
+            return (
+              <div
+                key={p.id}
+                className={`bg-white rounded-xl border overflow-hidden transition-colors ${conn ? "border-green-300" : "border-gray-200"}`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
-                    {p.name[0]}
-                  </div>
-                  <span className="font-medium text-gray-900">{p.name}</span>
-                  {conn && (
-                    <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                      <CheckCircle className="w-3 h-3" /> Bağlı
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {conn && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
-                      disabled={deleting === p.id}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      {deleting === p.id
-                        ? <Loader2 className="w-4 h-4 animate-spin" />
-                        : <Trash2 className="w-4 h-4" />}
-                    </button>
-                  )}
-                  {open === p.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
-                </div>
-              </button>
-
-              {open === p.id && (
-                <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
-                  <a
-                    href={p.guide}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    API bilgilerini {p.guideLabel}'nden al
-                  </a>
-                  {p.fields.map((f) => (
-                    <div key={f.key}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">{f.label}</label>
-                      <input
-                        type={f.key.includes("secret") || f.key.includes("password") ? "password" : "text"}
-                        placeholder={f.placeholder}
-                        value={values[p.id]?.[f.key] ?? ""}
-                        onChange={(e) => setValue(p.id, f.key, e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                      />
+                <button
+                  onClick={() => setOpen(open === p.id ? null : p.id)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${p.color}`}>
+                      {p.initials}
                     </div>
-                  ))}
-                  <button
-                    onClick={() => handleSave(p.id)}
-                    disabled={saving === p.id}
-                    className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 transition-colors"
-                  >
-                    {saving === p.id && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {saving === p.id ? "Kaydediliyor..." : conn ? "Güncelle" : "Bağla"}
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                    <span className="font-medium text-gray-900">{p.name}</span>
+                    {conn && (
+                      <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                        <CheckCircle className="w-3 h-3" /> Bağlı
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {conn && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
+                        disabled={deleting === p.id}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        {deleting === p.id
+                          ? <Loader2 className="w-4 h-4 animate-spin" />
+                          : <Trash2 className="w-4 h-4" />}
+                      </button>
+                    )}
+                    {open === p.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                  </div>
+                </button>
+
+                {open === p.id && (
+                  <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
+                    <a
+                      href={p.guide}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      {p.guideLabel}'nden bilgileri al
+                    </a>
+                    {p.fields.map((f) => (
+                      <div key={f.key}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1.5">{f.label}</label>
+                        <input
+                          type={f.key.includes("secret") || f.key.includes("password") || f.key.includes("token") ? "password" : "text"}
+                          placeholder={f.placeholder}
+                          value={values[p.id]?.[f.key] ?? ""}
+                          onChange={(e) => setValue(p.id, f.key, e.target.value)}
+                          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                        />
+                      </div>
+                    ))}
+                    <button
+                      onClick={() => handleSave(p.id)}
+                      disabled={saving === p.id}
+                      className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 transition-colors"
+                    >
+                      {saving === p.id && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {saving === p.id ? "Kaydediliyor..." : conn ? "Güncelle" : "Bağla"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
 
       <div className="bg-gray-50 rounded-xl border border-gray-200 p-5 text-center">
         <p className="text-sm text-gray-500">Başka bir platform mu kullanıyorsun?</p>
