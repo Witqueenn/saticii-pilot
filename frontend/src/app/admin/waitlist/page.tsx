@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Mail, Download, Users } from "lucide-react";
+import { Mail, Download, Users, Send, Loader2, CheckCircle } from "lucide-react";
 
 interface WaitlistEntry {
   id: string;
@@ -13,6 +13,8 @@ interface WaitlistEntry {
 export default function WaitlistPage() {
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [inviting, setInviting] = useState<string | null>(null);
+  const [invited, setInvited] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     async function load() {
@@ -26,6 +28,20 @@ export default function WaitlistPage() {
     }
     load();
   }, []);
+
+  async function sendInvite(email: string) {
+    setInviting(email);
+    try {
+      await fetch("/api/admin/waitlist-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setInvited((prev) => new Set(prev).add(email));
+    } finally {
+      setInviting(null);
+    }
+  }
 
   function exportCSV() {
     const header = "Email,Tarih";
@@ -111,16 +127,28 @@ export default function WaitlistPage() {
         ) : (
           <div className="divide-y divide-gray-100">
             {entries.map((e) => (
-              <div key={e.id} className="px-5 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {e.email.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-sm text-gray-800">{e.email}</span>
+              <div key={e.id} className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
+                <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                  {e.email.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-xs text-gray-400">
+                <span className="text-sm text-gray-800 flex-1 min-w-0 truncate">{e.email}</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">
                   {new Date(e.created_at).toLocaleDateString("tr-TR")}
                 </span>
+                {invited.has(e.email) ? (
+                  <span className="flex items-center gap-1 text-xs text-green-600 font-medium flex-shrink-0">
+                    <CheckCircle className="w-3.5 h-3.5" /> Gönderildi
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => sendInvite(e.email)}
+                    disabled={inviting === e.email}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 text-white rounded-lg text-xs font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors flex-shrink-0"
+                  >
+                    {inviting === e.email ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                    Davet Gönder
+                  </button>
+                )}
               </div>
             ))}
           </div>
