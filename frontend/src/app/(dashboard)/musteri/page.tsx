@@ -33,12 +33,11 @@ export default function MusteriPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: seller } = await supabase
-        .from("sellers")
-        .select("plan")
-        .eq("id", user.id)
-        .single();
-      setPlan(seller?.plan ?? "temel");
+      const [{ data: adminData }, { data: seller }] = await Promise.all([
+        supabase.from("admin_users").select("id").eq("id", user.id).single(),
+        supabase.from("sellers").select("plan").eq("id", user.id).single(),
+      ]);
+      setPlan(adminData ? "profesyonel" : (seller?.plan ?? "temel"));
 
       // Get or create form
       let { data: form } = await supabase
