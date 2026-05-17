@@ -273,7 +273,7 @@ export default function LeadsPage() {
                     value={form.shop_name}
                     onChange={(e) => setForm({ ...form, shop_name: e.target.value })}
                     placeholder="Ayşe'nin Butik"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                   />
                 </div>
 
@@ -282,7 +282,7 @@ export default function LeadsPage() {
                   <select
                     value={form.marketplace}
                     onChange={(e) => setForm({ ...form, marketplace: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                   >
                     {MARKETPLACES.map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>
@@ -293,7 +293,7 @@ export default function LeadsPage() {
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                   >
                     {STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                   </select>
@@ -305,7 +305,7 @@ export default function LeadsPage() {
                     value={form.contact_name}
                     onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
                     placeholder="Ayşe Kaya"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                   />
                 </div>
 
@@ -316,7 +316,7 @@ export default function LeadsPage() {
                     value={form.contact_email}
                     onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
                     placeholder="ayse@ornek.com"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                   />
                 </div>
 
@@ -326,7 +326,7 @@ export default function LeadsPage() {
                     value={form.contact_phone}
                     onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
                     placeholder="0532 000 00 00"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                   />
                 </div>
 
@@ -336,7 +336,7 @@ export default function LeadsPage() {
                     value={form.source}
                     onChange={(e) => setForm({ ...form, source: e.target.value })}
                     placeholder="LinkedIn, Trendyol arama, referans..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                   />
                 </div>
 
@@ -346,7 +346,7 @@ export default function LeadsPage() {
                     value={form.store_url}
                     onChange={(e) => setForm({ ...form, store_url: e.target.value })}
                     placeholder="https://www.trendyol.com/magaza/..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                   />
                 </div>
 
@@ -357,7 +357,7 @@ export default function LeadsPage() {
                     onChange={(e) => setForm({ ...form, notes: e.target.value })}
                     rows={3}
                     placeholder="Görüşme notları, ilgi alanları, takip tarihi..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 resize-none"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 resize-none"
                   />
                 </div>
               </div>
