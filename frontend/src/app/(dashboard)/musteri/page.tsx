@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Copy, Download, Star, Mail, CheckCircle, MessageSquare, Users } from "lucide-react";
 import QRCode from "qrcode";
@@ -16,16 +16,87 @@ interface Response {
   created_at: string;
 }
 
-const BASE_URL = "https://saticii-pilot.vercel.app";
+const BASE_URL = "https://saticipilot.com";
+
+function toSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s")
+    .replace(/ı/g, "i").replace(/ö/g, "o").replace(/ç/g, "c")
+    .replace(/[^a-z0-9]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 18);
+}
+
+async function generateBrandedQR(url: string, shopName: string): Promise<string> {
+  const rawQR = await QRCode.toDataURL(url, {
+    margin: 1,
+    width: 400,
+    color: { dark: "#ea580c", light: "#ffffff" },
+  });
+
+  const canvas = document.createElement("canvas");
+  const size = 400;
+  const bottomPad = 64;
+  canvas.width = size;
+  canvas.height = size + bottomPad;
+  const ctx = canvas.getContext("2d")!;
+
+  // Beyaz arka plan
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // QR kodu çiz
+  const img = new Image();
+  img.src = rawQR;
+  await new Promise<void>((resolve) => { img.onload = () => resolve(); });
+  ctx.drawImage(img, 0, 0, size, size);
+
+  // Merkez logo — beyaz daire
+  const cx = size / 2;
+  const cy = size / 2;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Turuncu daire
+  ctx.fillStyle = "#ea580c";
+  ctx.beginPath();
+  ctx.arc(cx, cy, 24, 0, Math.PI * 2);
+  ctx.fill();
+
+  // S harfi
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 26px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("S", cx, cy + 1);
+
+  // Mağaza adı
+  ctx.fillStyle = "#111827";
+  ctx.font = "bold 15px Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText(shopName, size / 2, size + 10);
+
+  // Alt bilgi
+  ctx.fillStyle = "#9ca3af";
+  ctx.font = "12px Arial, sans-serif";
+  ctx.fillText("saticipilot.com", size / 2, size + 36);
+
+  return canvas.toDataURL("image/png");
+}
 
 export default function MusteriPage() {
   const [formSlug, setFormSlug] = useState<string | null>(null);
+  const [shopName, setShopName] = useState("Mağazam");
   const [responses, setResponses] = useState<Response[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [qrUrl, setQrUrl] = useState<string>("");
   const [plan, setPlan] = useState<string | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     async function load() {
@@ -35,11 +106,14 @@ export default function MusteriPage() {
 
       const [{ data: adminData }, { data: seller }] = await Promise.all([
         supabase.from("admin_users").select("id").eq("id", user.id).single(),
-        supabase.from("sellers").select("plan").eq("id", user.id).single(),
+        supabase.from("sellers").select("plan, shop_name").eq("id", user.id).single(),
       ]);
       setPlan(adminData ? "profesyonel" : (seller?.plan ?? "temel"));
 
-      // Get or create form
+      const name = seller?.shop_name ?? user.user_metadata?.shop_name ?? "Mağazam";
+      setShopName(name);
+
+      // Form slug al veya oluştur
       let { data: form } = await supabase
         .from("customer_forms")
         .select("slug")
@@ -47,7 +121,9 @@ export default function MusteriPage() {
         .single();
 
       if (!form) {
-        const slug = user.id.replace(/-/g, "").slice(0, 12);
+        const base = toSlug(name);
+        const suffix = Math.random().toString(36).slice(2, 6);
+        const slug = base ? `${base}-${suffix}` : suffix;
         const { data: newForm } = await supabase
           .from("customer_forms")
           .insert({ seller_id: user.id, slug })
@@ -74,9 +150,8 @@ export default function MusteriPage() {
   useEffect(() => {
     if (!formSlug) return;
     const url = `${BASE_URL}/f/${formSlug}`;
-    QRCode.toDataURL(url, { margin: 2, width: 280, color: { dark: "#111827", light: "#ffffff" } })
-      .then(setQrUrl);
-  }, [formSlug]);
+    generateBrandedQR(url, shopName).then(setQrUrl);
+  }, [formSlug, shopName]);
 
   const formUrl = formSlug ? `${BASE_URL}/f/${formSlug}` : "";
 
@@ -90,7 +165,7 @@ export default function MusteriPage() {
     if (!qrUrl) return;
     const a = document.createElement("a");
     a.href = qrUrl;
-    a.download = "musteri-formu-qr.png";
+    a.download = `${formSlug ?? "qr"}-musteri-formu.png`;
     a.click();
   }
 
@@ -157,9 +232,12 @@ export default function MusteriPage() {
         <div className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col items-center gap-4">
           <p className="text-sm font-semibold text-gray-700 self-start">QR Kod</p>
           {qrUrl ? (
-            <img src={qrUrl} alt="QR Kod" className="w-44 h-44 rounded-xl" />
+            <div className="rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrUrl} alt="QR Kod" className="w-48 h-auto" />
+            </div>
           ) : (
-            <div className="w-44 h-44 bg-gray-100 rounded-xl animate-pulse" />
+            <div className="w-48 h-52 bg-gray-100 rounded-2xl animate-pulse" />
           )}
           <button
             onClick={downloadQR}
@@ -204,8 +282,7 @@ export default function MusteriPage() {
               <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2">
-                      {/* Stars */}
+                    <div className="flex items-center gap-2 flex-wrap">
                       <div className="flex">
                         {[1, 2, 3, 4, 5].map((s) => (
                           <Star
@@ -219,7 +296,7 @@ export default function MusteriPage() {
                       )}
                     </div>
                     {r.comment && <p className="text-sm text-gray-700">{r.comment}</p>}
-                    <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <div className="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
                       {r.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{r.email}</span>}
                       {r.wants_newsletter && <span className="text-green-600">● Bülten abonesi</span>}
                     </div>
@@ -233,7 +310,6 @@ export default function MusteriPage() {
           </div>
         )}
       </div>
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
