@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 function emailHtml(shopName: string, urgentCount: number, dashboardUrl: string) {
   return `<!DOCTYPE html>
@@ -74,6 +78,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ skipped: true });
   }
 
+  const supabase = getSupabase();
+
   // Satıcı bilgilerini çek
   const { data: seller } = await supabase
     .from("sellers")
@@ -94,8 +100,9 @@ export async function POST(req: NextRequest) {
     .is("notified_at", null);
 
   const urgentCount = count ?? 1;
-  const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saticii-pilot.vercel.app/yorumlar";
+  const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saticii-pilot.vercel.app";
 
+  const resend = getResend();
   const { error } = await resend.emails.send({
     from: "SatıcıPilot <onboarding@resend.dev>",
     to: seller.email,
@@ -109,7 +116,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Bildirilen yorumu işaretle
-  await supabase
+  await getSupabase()
     .from("reviews")
     .update({ notified_at: new Date().toISOString() })
     .eq("id", review.id);
