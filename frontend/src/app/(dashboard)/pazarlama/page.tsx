@@ -4,9 +4,41 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Plus, Send, Tag, Calendar, Trash2, Loader2, CheckCircle,
-  Megaphone, Mail, Sparkles, Copy, Hash,
+  Megaphone, Mail, Sparkles, Copy, Hash, Zap, ToggleLeft, ToggleRight,
 } from "lucide-react";
 import ProGate from "@/components/ProGate";
+
+interface Automation {
+  id: string;
+  name: string;
+  trigger: string;
+  subject: string;
+  body: string;
+  discount_code: string | null;
+  is_active: boolean;
+  sent_count: number;
+}
+
+const TEMPLATES = [
+  {
+    name: "Karşılama + İndirim Kodu",
+    subject: "Geri bildiriminiz için teşekkürler! 🎁",
+    body: "Merhaba,\n\nDeğerli görüşünüz için çok teşekkür ederiz!\n\nSizin için özel bir indirim kodu hazırladık. Bir sonraki alışverişinizde kullanabilirsiniz.\n\nKod: {discount_code}\n\nİyi alışverişler dileriz,\n{shop_name}",
+    discount_code: "",
+  },
+  {
+    name: "Sade Teşekkür",
+    subject: "Geri bildiriminiz alındı",
+    body: "Merhaba,\n\nGörüşünüzü paylaştığınız için teşekkür ederiz. Daha iyi bir deneyim sunabilmek için her zaman değerlendirmelerinizi dikkate alıyoruz.\n\nSaygılarımızla,\n{shop_name}",
+    discount_code: "",
+  },
+  {
+    name: "Ürün Memnuniyeti + Öneri",
+    subject: "{urun} hakkında görüşünüz alındı",
+    body: "Merhaba,\n\n{urun} siparişiniz hakkındaki değerlendirmeniz için teşekkür ederiz.\n\nMağazamızdaki diğer ürünleri de incelemenizi öneririz. Size özel %10 indirim fırsatını kaçırmayın!\n\nKod: {discount_code}\n\n{shop_name}",
+    discount_code: "",
+  },
+];
 
 interface Campaign {
   id: string;
@@ -52,7 +84,17 @@ export default function PazarlamaPage() {
   const [plan, setPlan] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [tab, setTab] = useState<"kampanya" | "email">("kampanya");
+  const [tab, setTab] = useState<"kampanya" | "email" | "otomasyon">("kampanya");
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const [showAutoForm, setShowAutoForm] = useState(false);
+  const [savingAuto, setSavingAuto] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(0);
+  const [autoForm, setAutoForm] = useState({
+    name: TEMPLATES[0].name,
+    subject: TEMPLATES[0].subject,
+    body: TEMPLATES[0].body,
+    discount_code: "",
+  });
 
   // Segment counts
   const [segmentCounts, setSegmentCounts] = useState<Record<string, number>>({});
@@ -106,12 +148,12 @@ export default function PazarlamaPage() {
       setPlan(effectivePlan);
       if (effectivePlan !== "marketing") return;
 
-      const { data: cList } = await supabase
-        .from("campaigns")
-        .select("*")
-        .eq("seller_id", user.id)
-        .order("created_at", { ascending: false });
+      const [{ data: cList }, { data: aList }] = await Promise.all([
+        supabase.from("campaigns").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("automations").select("*").eq("seller_id", user.id).order("created_at", { ascending: false }),
+      ]);
       setCampaigns(cList ?? []);
+      setAutomations(aList ?? []);
       loadSegmentCounts();
     }
     load();
@@ -147,6 +189,42 @@ export default function PazarlamaPage() {
     const supabase = createClient();
     await supabase.from("campaigns").update({ status }).eq("id", id);
     setCampaigns((prev) => prev.map((c) => c.id === id ? { ...c, status } : c));
+  }
+
+  function applyTemplate(idx: number) {
+    const t = TEMPLATES[idx];
+    setSelectedTemplate(idx);
+    setAutoForm({ name: t.name, subject: t.subject, body: t.body, discount_code: t.discount_code });
+  }
+
+  async function saveAutomation() {
+    if (!userId || !autoForm.name || !autoForm.subject || !autoForm.body) return;
+    setSavingAuto(true);
+    const supabase = createClient();
+    const { data } = await supabase.from("automations").insert({
+      seller_id: userId,
+      name: autoForm.name,
+      trigger: "form_submitted",
+      subject: autoForm.subject,
+      body: autoForm.body,
+      discount_code: autoForm.discount_code || null,
+      is_active: true,
+    }).select().single();
+    if (data) setAutomations((prev) => [data, ...prev]);
+    setShowAutoForm(false);
+    setSavingAuto(false);
+  }
+
+  async function toggleAutomation(id: string, is_active: boolean) {
+    const supabase = createClient();
+    await supabase.from("automations").update({ is_active }).eq("id", id);
+    setAutomations((prev) => prev.map((a) => a.id === id ? { ...a, is_active } : a));
+  }
+
+  async function deleteAutomation(id: string) {
+    const supabase = createClient();
+    await supabase.from("automations").delete().eq("id", id);
+    setAutomations((prev) => prev.filter((a) => a.id !== id));
   }
 
   async function generateAI() {
@@ -204,6 +282,7 @@ export default function PazarlamaPage() {
         {[
           { key: "kampanya", label: "Kampanyalar", icon: Megaphone },
           { key: "email", label: "E-posta", icon: Mail },
+          { key: "otomasyon", label: "Otomasyonlar", icon: Zap },
         ].map(({ key, label, icon: Icon }) => (
           <button
             key={key}
@@ -487,6 +566,127 @@ export default function PazarlamaPage() {
           </div>
         </div>
       )}
+      {/* ── Otomasyonlar Tab ── */}
+      {tab === "otomasyon" && (
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm text-gray-600">Müşteri formu doldurulunca otomatik e-posta gider.</p>
+              <p className="text-xs text-gray-400 mt-0.5">Değişkenler: <code className="bg-gray-100 px-1 rounded">{"{shop_name}"}</code> <code className="bg-gray-100 px-1 rounded">{"{discount_code}"}</code> <code className="bg-gray-100 px-1 rounded">{"{urun}"}</code></p>
+            </div>
+            <button
+              onClick={() => setShowAutoForm(!showAutoForm)}
+              className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-orange-600 transition-colors flex-shrink-0"
+            >
+              <Plus className="w-4 h-4" /> Yeni
+            </button>
+          </div>
+
+          {showAutoForm && (
+            <div className="bg-white border border-orange-200 rounded-2xl p-5 space-y-4">
+              <h3 className="font-semibold text-gray-900">Yeni Otomasyon</h3>
+
+              {/* Şablon seçici */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Şablon Seç</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {TEMPLATES.map((t, i) => (
+                    <button
+                      key={i}
+                      onClick={() => applyTemplate(i)}
+                      className={`p-3 rounded-xl border text-left text-xs transition-all ${
+                        selectedTemplate === i
+                          ? "border-orange-400 bg-orange-50 text-orange-700"
+                          : "border-gray-200 text-gray-600 hover:border-gray-300"
+                      }`}
+                    >
+                      <span className="font-medium">{t.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Otomasyon Adı</label>
+                <input value={autoForm.name} onChange={(e) => setAutoForm((p) => ({ ...p, name: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">E-posta Konusu</label>
+                <input value={autoForm.subject} onChange={(e) => setAutoForm((p) => ({ ...p, subject: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">E-posta Metni</label>
+                <textarea value={autoForm.body} onChange={(e) => setAutoForm((p) => ({ ...p, body: e.target.value }))}
+                  rows={5}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 resize-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">İndirim Kodu <span className="text-gray-400 font-normal">(isteğe bağlı)</span></label>
+                <div className="flex gap-2">
+                  <input value={autoForm.discount_code} onChange={(e) => setAutoForm((p) => ({ ...p, discount_code: e.target.value.toUpperCase() }))}
+                    placeholder="HOSGELDIN10"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 font-mono tracking-widest" />
+                  <button onClick={() => setAutoForm((p) => ({ ...p, discount_code: generateCode() }))}
+                    className="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:border-orange-300 hover:text-orange-600 transition-colors">
+                    <Tag className="w-4 h-4" /> Oluştur
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={saveAutomation} disabled={savingAuto || !autoForm.name || !autoForm.subject || !autoForm.body}
+                  className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-50 transition-colors">
+                  {savingAuto && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Kaydet ve Aktifleştir
+                </button>
+                <button onClick={() => setShowAutoForm(false)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors">İptal</button>
+              </div>
+            </div>
+          )}
+
+          {automations.length === 0 && !showAutoForm ? (
+            <div className="bg-white border border-dashed border-gray-200 rounded-2xl p-10 text-center">
+              <Zap className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 text-sm font-medium">Henüz otomasyon yok</p>
+              <p className="text-gray-400 text-xs mt-1">Otomasyon ekleyince form dolduran her müşteriye otomatik mail gider.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {automations.map((a) => (
+                <div key={a.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-900 text-sm">{a.name}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${a.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                          {a.is_active ? "Aktif" : "Pasif"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">{a.subject}</p>
+                      <div className="flex items-center gap-3 text-xs text-gray-400">
+                        <span className="flex items-center gap-1"><Zap className="w-3 h-3" />Form doldurulunca</span>
+                        <span className="flex items-center gap-1"><Send className="w-3 h-3" />{a.sent_count} gönderildi</span>
+                        {a.discount_code && <span className="flex items-center gap-1"><Tag className="w-3 h-3" />{a.discount_code}</span>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button onClick={() => toggleAutomation(a.id, !a.is_active)}
+                        className={`transition-colors ${a.is_active ? "text-green-500 hover:text-gray-400" : "text-gray-300 hover:text-green-500"}`}>
+                        {a.is_active ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
+                      </button>
+                      <button onClick={() => deleteAutomation(a.id)} className="p-1.5 text-gray-300 hover:text-red-400 rounded-lg transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }
