@@ -112,7 +112,7 @@ export default function YorumlarPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl w-full">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Yorum Merkezi</h2>
@@ -130,7 +130,7 @@ export default function YorumlarPage() {
         </div>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
+      <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-lg w-fit">
         {filters.map(({ key, label }) => (
           <button
             key={key}
@@ -170,9 +170,9 @@ export default function YorumlarPage() {
                 r.is_urgent && !r.is_replied ? "border-red-200 shadow-sm shadow-red-50" : "border-gray-200"
               )}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">{r.product_name}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 truncate">{r.product_name}</p>
                   {r.customer_name && (
                     <p className="text-xs text-gray-400 mt-0.5">{r.customer_name}</p>
                   )}

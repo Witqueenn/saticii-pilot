@@ -217,7 +217,7 @@ export default function LandingPage() {
                 <Zap className="w-4 h-4" />
                 İlk 3 ay %50 indirim — sınırlı kontenjan
               </div>
-              <h1 className="text-5xl font-bold text-gray-900 leading-[1.1] mb-6 tracking-tight">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 leading-[1.1] mb-6 tracking-tight">
                 Trendyol satıcıları için<br />
                 <span className="text-orange-500">AI operasyon paneli</span>
               </h1>
@@ -304,7 +304,7 @@ export default function LandingPage() {
 
       {/* Stats bar */}
       <section className="border-y border-gray-100 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-6 py-8 grid grid-cols-3 gap-6 text-center">
+        <div className="max-w-4xl mx-auto px-6 py-8 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
           {[
             { icon: TrendingUp, value: "%34'e kadar", label: "iade azalması" },
             { icon: Clock, value: "2 saate kadar", label: "günlük tasarruf" },
@@ -376,11 +376,12 @@ export default function LandingPage() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900">Manuel yönetim vs SatıcıPilot</h2>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
+          <div className="min-w-[480px]">
           <div className="grid grid-cols-3 bg-gray-50 border-b border-gray-200">
-            <div className="px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">İşlem</div>
-            <div className="px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide border-l border-gray-200 text-center">Manuel</div>
-            <div className="px-5 py-3 text-xs font-semibold text-orange-600 uppercase tracking-wide border-l border-gray-200 text-center">SatıcıPilot</div>
+            <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">İşlem</div>
+            <div className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide border-l border-gray-200 text-center">Manuel</div>
+            <div className="px-4 py-3 text-xs font-semibold text-orange-600 uppercase tracking-wide border-l border-gray-200 text-center">SatıcıPilot</div>
           </div>
           {[
             { task: "Yorum yanıtları", manual: "Saatler sürer", ai: "AI taslak hazırlar" },
@@ -390,19 +391,20 @@ export default function LandingPage() {
             { task: "Platform takibi", manual: "Birden fazla panel", ai: "Tek panelde hepsi" },
           ].map((row, i) => (
             <div key={i} className="grid grid-cols-3 border-t border-gray-100">
-              <div className="px-5 py-3.5 text-sm font-medium text-gray-700">{row.task}</div>
-              <div className="px-5 py-3.5 border-l border-gray-200 text-center">
+              <div className="px-4 py-3.5 text-sm font-medium text-gray-700">{row.task}</div>
+              <div className="px-4 py-3.5 border-l border-gray-200 text-center">
                 <span className="flex items-center justify-center gap-1.5 text-sm text-gray-400">
-                  <X className="w-3.5 h-3.5 text-red-400" /> {row.manual}
+                  <X className="w-3.5 h-3.5 text-red-400 flex-shrink-0" /> {row.manual}
                 </span>
               </div>
-              <div className="px-5 py-3.5 border-l border-gray-200 bg-orange-50/50 text-center">
+              <div className="px-4 py-3.5 border-l border-gray-200 bg-orange-50/50 text-center">
                 <span className="flex items-center justify-center gap-1.5 text-sm text-orange-700 font-medium">
-                  <CheckCircle className="w-3.5 h-3.5 text-green-500" /> {row.ai}
+                  <CheckCircle className="w-3.5 h-3.5 text-green-500 flex-shrink-0" /> {row.ai}
                 </span>
               </div>
             </div>
           ))}
+          </div>
         </div>
       </section>
 

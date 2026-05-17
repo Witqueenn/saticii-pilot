@@ -178,7 +178,7 @@ export default function BaglantiPage() {
   const totalConnected = connected.length;
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Bağlantılar</h2>
         <p className="text-gray-500 mt-1">

@@ -302,7 +302,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Günlük Özet</h2>
         <p className="text-gray-500 mt-1">
@@ -315,7 +315,7 @@ export default function DashboardPage() {
       )}
 
       {/* KPI Kartları */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {loading ? (
           <><CardSkeleton /><CardSkeleton /><CardSkeleton /><CardSkeleton /></>
         ) : stats.map((s) => (
@@ -437,11 +437,11 @@ export default function DashboardPage() {
       {/* Platform Destek Durumu */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="font-semibold text-gray-900 text-sm mb-4">Desteklenen Pazaryerleri</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 xs:grid-cols-2 gap-3">
           {platformStatuses.map((p) => (
-            <div key={p.name} className="flex items-center justify-between px-4 py-3 rounded-xl bg-gray-50 border border-gray-100">
-              <span className="text-sm font-medium text-gray-700">{p.name}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.color}`}>{p.status}</span>
+            <div key={p.name} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
+              <span className="text-sm font-medium text-gray-700 truncate mr-2">{p.name}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${p.color}`}>{p.status}</span>
             </div>
           ))}
         </div>

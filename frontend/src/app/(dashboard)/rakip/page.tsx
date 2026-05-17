@@ -160,7 +160,7 @@ export default function RakipPage() {
   if (plan !== "profesyonel") return <ProGate feature="Rakip Fiyat Analizi" />;
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl w-full">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -177,7 +177,7 @@ export default function RakipPage() {
 
       {/* Summary cards */}
       {products.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {(["pahali", "uygun", "ucuz"] as const).map((s) => {
             const cfg = STATUS_CONFIG[s];
             const Icon = cfg.icon;
@@ -251,7 +251,7 @@ export default function RakipPage() {
             return (
               <div key={p.productId} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <button
-                  className="w-full text-left px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors"
+                  className="w-full text-left px-3 sm:px-5 py-4 flex items-center gap-2 sm:gap-4 hover:bg-gray-50 transition-colors"
                   onClick={() => setExpanded(isOpen ? null : p.productId)}
                 >
                   {/* Status indicator */}
@@ -281,7 +281,7 @@ export default function RakipPage() {
                   </div>
 
                   {/* Diff badge */}
-                  <div className={clsx("flex-shrink-0 px-3 py-1.5 rounded-lg text-center min-w-[72px]", cfg.badge)}>
+                  <div className={clsx("hidden sm:block flex-shrink-0 px-3 py-1.5 rounded-lg text-center min-w-[64px]", cfg.badge)}>
                     <p className="text-xs font-bold">
                       {p.diffPct > 0 ? "+" : ""}{p.diffPct}%
                     </p>

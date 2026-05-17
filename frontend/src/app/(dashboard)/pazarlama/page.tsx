@@ -348,7 +348,7 @@ export default function PazarlamaPage() {
   const recipientCount = segmentCounts[segment] ?? 0;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Pazarlama</h2>
         <p className="text-gray-500 mt-1">Kampanya planla, müşterilere hedefli e-posta gönder, AI ile içerik üret.</p>

@@ -91,7 +91,7 @@ export default function IadelerPage() {
   const patterns = buildPatterns(returns);
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">İade Analizi</h2>
         <p className="text-gray-500 mt-1">Tekrar eden iade sebepleri ve AI önerileri</p>
@@ -135,9 +135,9 @@ export default function IadelerPage() {
           <h3 className="text-sm font-semibold text-gray-700">Ürün Bazlı Kalıp Analizi</h3>
           {patterns.map((p) => (
             <div key={p.product_name} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">{p.product_name}</p>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-gray-900 truncate">{p.product_name}</p>
                   <p className="text-sm text-gray-500 mt-0.5">
                     {p.total} iade · Başlıca: <strong>{reasonLabel[p.topReason]}</strong>
                   </p>

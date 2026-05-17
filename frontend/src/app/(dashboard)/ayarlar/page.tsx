@@ -113,7 +113,7 @@ export default function AyarlarPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-2xl w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Ayarlar</h2>
         <p className="text-gray-500 mt-1">Hesap ve mağaza bilgilerini yönet</p>

@@ -175,7 +175,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* ── İçerik ───────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 pb-24 md:pb-8">
+      <main className="flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-8 pb-24 md:pb-8">
         {children}
       </main>
 
@@ -195,7 +195,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             >
               <Icon className="w-5 h-5" />
-              <span className="text-[9px] font-medium">{label}</span>
+              <span className="text-[10px] font-medium leading-tight">{label}</span>
             </Link>
           );
         })}

@@ -112,7 +112,7 @@ export default function MusteriPage() {
   if (plan !== "profesyonel") return <ProGate feature="Müşteri Takibi & QR Form" />;
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Müşteri Geri Bildirimi</h2>
         <p className="text-gray-500 mt-1">Form linkini paylaş, müşterilerinden puan ve yorum topla.</p>
