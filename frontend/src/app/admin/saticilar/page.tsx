@@ -18,18 +18,18 @@ interface Seller {
 const planColor: Record<string, string> = {
   temel: "bg-gray-100 text-gray-600",
   profesyonel: "bg-orange-100 text-orange-700",
-  kurumsal: "bg-purple-100 text-purple-700",
+  marketing: "bg-indigo-100 text-indigo-700",
 };
 
 const planLabel: Record<string, string> = {
   temel: "Temel",
-  profesyonel: "Profesyonel",
-  kurumsal: "Kurumsal",
+  profesyonel: "Pro",
+  marketing: "Marketing",
 };
 
-const planOptions = ["temel", "profesyonel", "kurumsal"];
+const planOptions = ["temel", "profesyonel", "marketing"];
 
-type FilterPlan = "hepsi" | "temel" | "profesyonel" | "kurumsal";
+type FilterPlan = "hepsi" | "temel" | "profesyonel" | "marketing";
 type FilterStatus = "hepsi" | "aktif" | "pasif";
 
 export default function SaticilarPage() {
@@ -77,7 +77,7 @@ export default function SaticilarPage() {
     const matchSearch =
       s.shop_name.toLowerCase().includes(search.toLowerCase()) ||
       s.email.toLowerCase().includes(search.toLowerCase());
-    const matchPlan = filterPlan === "hepsi" || s.plan === filterPlan;
+    const matchPlan = filterPlan === "hepsi" || s.plan === filterPlan as string;
     const matchStatus =
       filterStatus === "hepsi" ||
       (filterStatus === "aktif" && s.is_active) ||
@@ -112,7 +112,7 @@ export default function SaticilarPage() {
           <option value="hepsi">Tüm Planlar</option>
           <option value="temel">Temel</option>
           <option value="profesyonel">Profesyonel</option>
-          <option value="kurumsal">Kurumsal</option>
+          <option value="marketing">Marketing</option>
         </select>
         <select
           value={filterStatus}
