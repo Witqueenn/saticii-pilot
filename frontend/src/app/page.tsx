@@ -327,12 +327,32 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* SSS */}
+      <section className="px-6 py-20 max-w-3xl mx-auto">
+        <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">Sık Sorulan Sorular</h2>
+        <div className="space-y-4">
+          {[
+            { q: "Hangi pazaryerlerini destekliyorsunuz?", a: "Trendyol, Hepsiburada, N11, Amazon TR ve Çiçeksepeti entegrasyonları mevcut. Diğer platformlar için talep formunu doldurabilirsin." },
+            { q: "Kredi kartı bilgisi vermem gerekiyor mu?", a: "14 günlük deneme sürecinde kredi kartı gerekmez. Deneme süresi sonunda istersen ücretli plana geçebilirsin." },
+            { q: "Verilerim güvende mi?", a: "Tüm API bilgilerin şifreli olarak saklanır. Verilerini yalnızca analiz için kullanıyoruz, üçüncü taraflarla paylaşmıyoruz." },
+            { q: "Mevcut planımı değiştirebilir miyim?", a: "İstediğin zaman planını yükseltebilir veya düşürebilirsin. Değişiklikler anında geçerli olur." },
+            { q: "Teknik destek var mı?", a: "Profesyonel ve Kurumsal plan kullanıcılarına öncelikli e-posta desteği sunuyoruz. Temel planda topluluk desteği mevcut." },
+          ].map((item) => (
+            <div key={item.q} className="bg-white rounded-xl border border-gray-200 p-5">
+              <p className="font-semibold text-gray-900 mb-2">{item.q}</p>
+              <p className="text-sm text-gray-500 leading-relaxed">{item.a}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-gray-100 px-6 py-8">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="font-bold text-gray-900">SatıcıPilot</span>
           <p className="text-sm text-gray-400">© 2026 SatıcıPilot. Tüm hakları saklıdır.</p>
           <div className="flex gap-4 text-sm text-gray-400">
+            <Link href="/blog" className="hover:text-gray-600 transition-colors">Blog</Link>
             <a href="#" className="hover:text-gray-600 transition-colors">Gizlilik</a>
             <a href="#" className="hover:text-gray-600 transition-colors">Kullanım Şartları</a>
           </div>
