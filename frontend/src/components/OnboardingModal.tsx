@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Store, Link2, LayoutDashboard, ChevronRight, X, CheckCircle } from "lucide-react";
+import { Store, Link2, LayoutDashboard, ChevronRight, X, CheckCircle, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 const steps = [
@@ -17,12 +17,13 @@ const steps = [
   {
     id: "baglanti",
     icon: Link2,
-    title: "Pazaryerini bağla",
-    desc: "Trendyol, Hepsiburada veya N11 mağazanı bağlayarak gerçek verilerle analiz başlat. Daha sonra da bağlayabilirsin.",
-    cta: "Şimdi Bağla",
+    title: "Verilerini bağla",
+    desc: "Trendyol, Hepsiburada veya N11 mağazanı API ile bağla — ya da mevcut yorumlarını CSV olarak yükle ve hemen analiz başlat.",
+    cta: "API ile Bağla",
     skip: true,
     skipLabel: "Sonra Bağlarım",
     href: "/baglanti",
+    csvHref: "/yorumlar?csv=1",
   },
   {
     id: "hazir",
@@ -55,21 +56,19 @@ export default function OnboardingModal({ onClose }: Props) {
   }
 
   function handleCta() {
-    if (isLast) {
-      markDone();
-      return;
-    }
-    if (current.href) {
-      markDone();
-      router.push(current.href);
-      return;
-    }
+    if (isLast) { markDone(); return; }
+    if (current.href) { markDone(); router.push(current.href); return; }
     setStep((s) => s + 1);
   }
 
   function handleSkip() {
     if (isLast) { markDone(); return; }
     setStep((s) => s + 1);
+  }
+
+  function handleCsv() {
+    markDone();
+    router.push((current as { csvHref?: string }).csvHref ?? "/yorumlar?csv=1");
   }
 
   return (
@@ -115,10 +114,22 @@ export default function OnboardingModal({ onClose }: Props) {
               {!isLast && <ChevronRight className="w-4 h-4" />}
               {isLast && <CheckCircle className="w-4 h-4" />}
             </button>
+
+            {/* CSV seçeneği — sadece "baglanti" adımında */}
+            {current.id === "baglanti" && (
+              <button
+                onClick={handleCsv}
+                className="w-full border border-gray-200 py-2.5 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4 text-gray-400" />
+                CSV ile Hızlı Başla
+              </button>
+            )}
+
             {current.skip && (
               <button
                 onClick={handleSkip}
-                className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                className="w-full py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors"
               >
                 {current.skipLabel}
               </button>
