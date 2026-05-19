@@ -17,7 +17,11 @@ create table if not exists sellers (
 create table if not exists marketplace_credentials (
   id            uuid primary key default gen_random_uuid(),
   seller_id     uuid not null references sellers(id) on delete cascade,
-  marketplace   text not null check (marketplace in ('trendyol', 'hepsiburada', 'n11')),
+  marketplace   text not null check (marketplace in (
+    'trendyol', 'hepsiburada', 'n11',
+    'amazon_tr', 'pazarama', 'etsy',
+    'woocommerce', 'shopify', 'custom_website', 'instagram'
+  )),
   api_key       text not null,
   api_secret    text not null,
   supplier_id   text,

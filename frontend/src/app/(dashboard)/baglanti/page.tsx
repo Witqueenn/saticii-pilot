@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   CheckCircle, ExternalLink, ChevronDown, ChevronUp,
-  Trash2, Loader2, MessageSquare,
+  Trash2, Loader2, MessageSquare, Clock,
   RotateCcw, Package, Star, TrendingUp, ShoppingBag, Globe,
 } from "lucide-react";
 
@@ -16,9 +16,10 @@ interface Platform {
   color: string;
   description: string;
   features: { icon: React.ElementType; text: string }[];
-  fields: Field[];
-  guide: string;
-  guideLabel: string;
+  fields?: Field[];
+  guide?: string;
+  guideLabel?: string;
+  comingSoon?: boolean;
 }
 
 const PLATFORMS: { title: string; items: Platform[] }[] = [
@@ -95,13 +96,9 @@ const PLATFORMS: { title: string; items: Platform[] }[] = [
           { icon: MessageSquare, text: "Review & Q&A yönetimi" },
           { icon: TrendingUp,    text: "Buy Box takibi & rekabet analizi" },
         ],
-        fields: [
-          { key: "api_key",     label: "Access Key ID",     placeholder: "Amazon SP-API Access Key" },
-          { key: "api_secret",  label: "Secret Access Key", placeholder: "Amazon Secret Key" },
-          { key: "supplier_id", label: "Seller ID",         placeholder: "Amazon Seller ID" },
-        ],
         guide: "https://sellercentral.amazon.com.tr",
         guideLabel: "Amazon Seller Central",
+        comingSoon: true,
       },
       {
         id: "pazarama",
@@ -115,12 +112,7 @@ const PLATFORMS: { title: string; items: Platform[] }[] = [
           { icon: Package,       text: "Ürün listing optimizasyonu" },
           { icon: Star,          text: "Mağaza puanı & performans takibi" },
         ],
-        fields: [
-          { key: "api_key",    label: "API Key",    placeholder: "Pazarama API Key" },
-          { key: "api_secret", label: "API Secret", placeholder: "Pazarama API Secret" },
-        ],
-        guide: "https://www.pazarama.com/satici-ol",
-        guideLabel: "Pazarama Satıcı Paneli",
+        comingSoon: true,
       },
       {
         id: "etsy",
@@ -134,13 +126,7 @@ const PLATFORMS: { title: string; items: Platform[] }[] = [
           { icon: Package,       text: "Listing SEO optimizasyonu (Etsy arama)" },
           { icon: TrendingUp,    text: "Shop stats & en çok satan ürün analizi" },
         ],
-        fields: [
-          { key: "api_key",     label: "API Key (Keystring)", placeholder: "Etsy API Keystring" },
-          { key: "api_secret",  label: "Shared Secret",       placeholder: "Etsy Shared Secret" },
-          { key: "supplier_id", label: "Shop ID",             placeholder: "Etsy Shop ID veya kullanıcı adı" },
-        ],
-        guide: "https://www.etsy.com/developers/register",
-        guideLabel: "Etsy Developer Portal",
+        comingSoon: true,
       },
     ],
   },
@@ -159,13 +145,7 @@ const PLATFORMS: { title: string; items: Platform[] }[] = [
           { icon: Package,       text: "Ürün katalog senkronizasyonu (Trendyol ↔ WC)" },
           { icon: TrendingUp,    text: "Çok kanallı satış performans karşılaştırması" },
         ],
-        fields: [
-          { key: "store_url",  label: "Mağaza URL",      placeholder: "https://magaza.com" },
-          { key: "api_key",    label: "Consumer Key",    placeholder: "ck_xxxxxxxxxxxx" },
-          { key: "api_secret", label: "Consumer Secret", placeholder: "cs_xxxxxxxxxxxx" },
-        ],
-        guide: "https://woo.com/document/woocommerce-rest-api/",
-        guideLabel: "WooCommerce API Dokümantasyonu",
+        comingSoon: true,
       },
       {
         id: "shopify",
@@ -179,19 +159,8 @@ const PLATFORMS: { title: string; items: Platform[] }[] = [
           { icon: RotateCcw,     text: "İade akışı karşılaştırması" },
           { icon: TrendingUp,    text: "Kanal bazlı gelir & büyüme analizi" },
         ],
-        fields: [
-          { key: "store_url",  label: "Mağaza URL",    placeholder: "magaza.myshopify.com" },
-          { key: "api_key",    label: "API Key",        placeholder: "Shopify Admin API Key" },
-          { key: "api_secret", label: "Access Token",   placeholder: "shpat_xxxxxxxxxxxx" },
-        ],
-        guide: "https://shopify.dev/docs/api/admin-rest",
-        guideLabel: "Shopify Admin API",
+        comingSoon: true,
       },
-    ],
-  },
-  {
-    title: "Kendi Web Sitem",
-    items: [
       {
         id: "custom_website",
         name: "Özel Web Sitesi",
@@ -204,12 +173,7 @@ const PLATFORMS: { title: string; items: Platform[] }[] = [
           { icon: RotateCcw,     text: "İade talepleri takibi" },
           { icon: TrendingUp,    text: "Pazaryeri vs web sitesi satış karşılaştırması" },
         ],
-        fields: [
-          { key: "store_url",  label: "Web Sitesi URL",  placeholder: "https://magaza.com" },
-          { key: "api_key",    label: "API Key / Token", placeholder: "Sitenin API anahtarı (isteğe bağlı)" },
-        ],
-        guide: "https://docs.saticipilot.com/web-entegrasyon",
-        guideLabel: "Entegrasyon Dokümantasyonu",
+        comingSoon: true,
       },
     ],
   },
@@ -228,12 +192,7 @@ const PLATFORMS: { title: string; items: Platform[] }[] = [
           { icon: TrendingUp,    text: "Instagram → Trendyol dönüşüm analizi" },
           { icon: Package,       text: "DM'den gelen sipariş talepleri yönetimi" },
         ],
-        fields: [
-          { key: "api_key",     label: "Access Token",       placeholder: "Instagram Graph API Access Token" },
-          { key: "supplier_id", label: "Business Account ID", placeholder: "Instagram işletme hesap ID" },
-        ],
-        guide: "https://developers.facebook.com/docs/instagram-api/",
-        guideLabel: "Instagram Graph API Dokümantasyonu",
+        comingSoon: true,
       },
     ],
   },
@@ -243,6 +202,7 @@ interface Credential { id: string; marketplace: string; }
 
 export default function BaglantiPage() {
   const [connected, setConnected] = useState<Credential[]>([]);
+  const [interests, setInterests] = useState<string[]>([]);
   const [open, setOpen] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, Record<string, string>>>({});
   const [saving, setSaving] = useState<string | null>(null);
@@ -255,11 +215,13 @@ export default function BaglantiPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
-      const { data } = await supabase
-        .from("marketplace_credentials")
-        .select("id, marketplace")
-        .eq("seller_id", user.id);
-      setConnected(data ?? []);
+
+      const [{ data: creds }, { data: ints }] = await Promise.all([
+        supabase.from("marketplace_credentials").select("id, marketplace").eq("seller_id", user.id),
+        supabase.from("platform_interests").select("platform").eq("seller_id", user.id),
+      ]);
+      setConnected(creds ?? []);
+      setInterests((ints ?? []).map((r: { platform: string }) => r.platform));
     }
     load();
   }, []);
@@ -312,6 +274,18 @@ export default function BaglantiPage() {
     setDeleting(null);
   }
 
+  async function handleInterest(platformId: string) {
+    if (!userId) return;
+    setSaving(platformId);
+    const supabase = createClient();
+    await supabase.from("platform_interests").upsert(
+      { seller_id: userId, platform: platformId },
+      { onConflict: "seller_id,platform" }
+    );
+    setInterests((prev) => [...prev, platformId]);
+    setSaving(null);
+  }
+
   const totalConnected = connected.length;
 
   return (
@@ -335,25 +309,33 @@ export default function BaglantiPage() {
 
           {section.items.map((p) => {
             const conn = isConnected(p.id);
+            const interested = interests.includes(p.id);
             return (
               <div
                 key={p.id}
-                className={`bg-white rounded-xl border overflow-hidden transition-colors ${conn ? "border-green-300" : "border-gray-200"}`}
+                className={`bg-white rounded-xl border overflow-hidden transition-colors ${
+                  conn ? "border-green-300" : p.comingSoon ? "border-gray-100" : "border-gray-200"
+                }`}
               >
                 <button
                   onClick={() => setOpen(open === p.id ? null : p.id)}
                   className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${p.color}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${p.color} ${p.comingSoon ? "opacity-60" : ""}`}>
                       {p.initials}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{p.name}</span>
+                        <span className={`font-medium ${p.comingSoon ? "text-gray-400" : "text-gray-900"}`}>{p.name}</span>
                         {conn && (
                           <span className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
                             <CheckCircle className="w-3 h-3" /> Bağlı
+                          </span>
+                        )}
+                        {p.comingSoon && !conn && (
+                          <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                            <Clock className="w-3 h-3" /> Yakında
                           </span>
                         )}
                       </div>
@@ -374,9 +356,8 @@ export default function BaglantiPage() {
                   </div>
                 </button>
 
-                {/* Platform features */}
                 {open !== p.id && (
-                  <div className="px-5 pb-3 grid grid-cols-2 gap-1.5">
+                  <div className={`px-5 pb-3 grid grid-cols-2 gap-1.5 ${p.comingSoon ? "opacity-50" : ""}`}>
                     {p.features.map((f, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs text-gray-500">
                         <f.icon className="w-3.5 h-3.5 flex-shrink-0 text-orange-400" />
@@ -386,13 +367,50 @@ export default function BaglantiPage() {
                   </div>
                 )}
 
-                {open === p.id && (
+                {open === p.id && p.comingSoon && (
+                  <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
+                    <div className="grid grid-cols-2 gap-1.5 mb-2">
+                      {p.features.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-gray-500">
+                          <f.icon className="w-3.5 h-3.5 flex-shrink-0 text-orange-400" />
+                          {f.text}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Bu entegrasyon geliştirme aşamasındadır. İlgilendiğini belirtirsen öncelik sırasına ekliyoruz ve hazır olunca seni bilgilendiriyoruz.
+                    </p>
+                    {interested ? (
+                      <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                        <CheckCircle className="w-4 h-4" /> Erken erişim isteğin kaydedildi
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleInterest(p.id)}
+                        disabled={saving === p.id}
+                        className="flex items-center gap-2 bg-gray-100 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-60 transition-colors"
+                      >
+                        {saving === p.id && <Loader2 className="w-4 h-4 animate-spin" />}
+                        Erken Erişim İste
+                      </button>
+                    )}
+                    {p.guide && (
+                      <a href={p.guide} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs text-blue-500 hover:underline">
+                        <ExternalLink className="w-3 h-3" />
+                        {p.guideLabel}
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {open === p.id && !p.comingSoon && (
                   <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">
                     {p.guide && (
                       <a href={p.guide} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline">
                         <ExternalLink className="w-3 h-3" />
-                        {p.guideLabel}'nden bilgileri al
+                        {p.guideLabel}&apos;nden bilgileri al
                       </a>
                     )}
                     {p.fields?.map((f) => (
