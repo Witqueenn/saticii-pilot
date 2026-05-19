@@ -33,9 +33,9 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: "Özet", tabBarIcon: (p) => <TabIcon focused={p.focused} active="home" inactive="home-outline" color={p.color} /> }} />
       <Tabs.Screen name="yorumlar" options={{ title: "Yorumlar", tabBarBadge: badges.urgentReviews > 0 ? badges.urgentReviews : undefined, tabBarBadgeStyle: { backgroundColor: "#ef4444", fontSize: 10 }, tabBarIcon: (p) => <TabIcon focused={p.focused} active="chatbubble" inactive="chatbubble-outline" color={p.color} /> }} />
       <Tabs.Screen name="iadeler" options={{ title: "İadeler", tabBarBadge: badges.pendingReturns > 0 ? badges.pendingReturns : undefined, tabBarBadgeStyle: { backgroundColor: "#ef4444", fontSize: 10 }, tabBarIcon: (p) => <TabIcon focused={p.focused} active="cube" inactive="cube-outline" color={p.color} /> }} />
-      <Tabs.Screen name="mesajlar" options={{ title: "Mesajlar", tabBarBadge: badges.unreadMessages > 0 ? badges.unreadMessages : undefined, tabBarBadgeStyle: { backgroundColor: "#ef4444", fontSize: 10 }, tabBarIcon: (p) => <TabIcon focused={p.focused} active="mail" inactive="mail-outline" color={p.color} /> }} />
+      <Tabs.Screen name="urunler" options={{ title: "Ürünler", tabBarIcon: (p) => <TabIcon focused={p.focused} active="cube" inactive="cube-outline" color={p.color} /> }} />
       <Tabs.Screen name="ayarlar" options={{ title: "Ayarlar", tabBarIcon: (p) => <TabIcon focused={p.focused} active="settings" inactive="settings-outline" color={p.color} /> }} />
-      <Tabs.Screen name="urunler" options={{ href: null }} />
+      <Tabs.Screen name="mesajlar" options={{ href: null }} />
       <Tabs.Screen name="istatistik" options={{ href: null }} />
     </Tabs>
   );

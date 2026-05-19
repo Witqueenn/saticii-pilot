@@ -240,12 +240,12 @@ export default function DashboardScreen() {
         )}
 
         {/* Hızlı erişim */}
-        <View style={styles.quickRow}>
-          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/(tabs)/urunler")}>
+        <View style={styles.quickGrid}>
+          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/(tabs)/mesajlar")}>
             <View style={[styles.quickIcon, { backgroundColor: "#eff6ff" }]}>
-              <Ionicons name="cube-outline" size={18} color="#3b82f6" />
+              <Ionicons name="mail-outline" size={18} color="#3b82f6" />
             </View>
-            <Text style={[styles.quickLabel, { color: t.text }]}>Ürünlerim</Text>
+            <Text style={[styles.quickLabel, { color: t.text }]}>Mesajlar</Text>
             <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/(tabs)/istatistik")}>
@@ -253,6 +253,20 @@ export default function DashboardScreen() {
               <Ionicons name="bar-chart-outline" size={18} color="#16a34a" />
             </View>
             <Text style={[styles.quickLabel, { color: t.text }]}>Analiz</Text>
+            <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/rakip")}>
+            <View style={[styles.quickIcon, { backgroundColor: "#fef3c7" }]}>
+              <Ionicons name="trending-up-outline" size={18} color="#d97706" />
+            </View>
+            <Text style={[styles.quickLabel, { color: t.text }]}>Rakip</Text>
+            <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/musteri")}>
+            <View style={[styles.quickIcon, { backgroundColor: "#f5f3ff" }]}>
+              <Ionicons name="people-outline" size={18} color="#6366f1" />
+            </View>
+            <Text style={[styles.quickLabel, { color: t.text }]}>Müşteriler</Text>
             <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
           </TouchableOpacity>
         </View>
@@ -331,7 +345,7 @@ const styles = StyleSheet.create({
   actionDot: { width: 7, height: 7, borderRadius: 4 },
   actionText: { flex: 1, fontSize: 13 },
   actionDivider: { height: 1, marginHorizontal: 16 },
-  quickRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
   quickCard: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 14, borderWidth: 1 },
   quickIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   quickLabel: { flex: 1, fontSize: 13, fontWeight: "600" },
