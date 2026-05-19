@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, CheckCircle, User, CreditCard, Store, Bell, Phone } from "lucide-react";
+import { Loader2, CheckCircle, CreditCard, Store, Bell, AlertTriangle, Mail, Phone, Globe } from "lucide-react";
 
 const planLabel: Record<string, string> = {
   temel: "Temel",
@@ -23,22 +23,38 @@ const planFeatures: Record<string, string[]> = {
 };
 
 interface Toggle {
-  key: "notify_urgent_reviews" | "notify_weekly_report";
+  key: "notify_urgent_reviews" | "notify_weekly_report" | "notify_new_returns" | "notify_low_stock";
   label: string;
   desc: string;
 }
 
 const TOGGLES: Toggle[] = [
-  { key: "notify_urgent_reviews", label: "Acil yorum bildirimi", desc: "Acil yorum geldiğinde e-posta al" },
+  { key: "notify_urgent_reviews", label: "Acil yorum bildirimi", desc: "1 yıldız yorum geldiğinde anında e-posta al" },
   { key: "notify_weekly_report", label: "Haftalık rapor", desc: "Her pazartesi haftalık özet e-postası al" },
+  { key: "notify_new_returns", label: "Yeni iade bildirimi", desc: "Yeni iade talebi oluştuğunda e-posta al" },
+  { key: "notify_low_stock", label: "Düşük stok uyarısı", desc: "Ürün stoğu kritik seviyeye düştüğünde bildirim al" },
 ];
+
+type NotifState = Record<Toggle["key"], boolean>;
+
+function getInitials(name: string, fallback: string) {
+  const src = name || fallback;
+  const parts = src.split(/[\s@]+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return src.slice(0, 2).toUpperCase();
+}
 
 export default function AyarlarPage() {
   const [shopName, setShopName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [plan, setPlan] = useState("temel");
-  const [notifs, setNotifs] = useState({ notify_urgent_reviews: true, notify_weekly_report: true });
+  const [notifs, setNotifs] = useState<NotifState>({
+    notify_urgent_reviews: true,
+    notify_weekly_report: true,
+    notify_new_returns: false,
+    notify_low_stock: false,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -57,7 +73,7 @@ export default function AyarlarPage() {
 
       const { data: seller } = await supabase
         .from("sellers")
-        .select("plan, notify_urgent_reviews, notify_weekly_report, phone")
+        .select("plan, notify_urgent_reviews, notify_weekly_report, notify_new_returns, notify_low_stock, phone")
         .eq("id", user.id)
         .single();
 
@@ -67,6 +83,8 @@ export default function AyarlarPage() {
         setNotifs({
           notify_urgent_reviews: seller.notify_urgent_reviews ?? true,
           notify_weekly_report: seller.notify_weekly_report ?? true,
+          notify_new_returns: seller.notify_new_returns ?? false,
+          notify_low_stock: seller.notify_low_stock ?? false,
         });
       }
       setLoading(false);
@@ -74,14 +92,14 @@ export default function AyarlarPage() {
     load();
   }, []);
 
-  async function saveShopName(e: React.FormEvent) {
+  async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.auth.updateUser({ data: { shop_name: shopName } });
-    await supabase.from("sellers").update({ shop_name: shopName }).eq("id", user.id);
+    await supabase.from("sellers").update({ shop_name: shopName, phone }).eq("id", user.id);
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -99,7 +117,7 @@ export default function AyarlarPage() {
     setTimeout(() => setSavedPhone(false), 3000);
   }
 
-  async function toggleNotif(key: "notify_urgent_reviews" | "notify_weekly_report", value: boolean) {
+  async function toggleNotif(key: Toggle["key"], value: boolean) {
     setTogglingKey(key);
     setNotifs((p) => ({ ...p, [key]: value }));
     const supabase = createClient();
@@ -109,131 +127,174 @@ export default function AyarlarPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Yükleniyor...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+      </div>
+    );
   }
+
+  const initials = getInitials(shopName, email);
 
   return (
     <div className="space-y-6 max-w-2xl w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Ayarlar</h2>
-        <p className="text-gray-500 mt-1">Hesap ve mağaza bilgilerini yönet</p>
+        <p className="text-gray-500 mt-1 text-sm">Hesap ve mağaza bilgilerini yönet</p>
       </div>
 
-      {/* Mağaza bilgileri */}
+      {/* Profile header */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4">
+        <div className="w-14 h-14 rounded-full bg-orange-500 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+          {initials}
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-gray-900 truncate">{shopName || "Mağaza adı belirlenmemiş"}</p>
+          <p className="text-sm text-gray-500 truncate">{email}</p>
+          <span className={`mt-1 inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${planColor[plan] ?? planColor.temel}`}>
+            {planLabel[plan] ?? plan} Plan
+          </span>
+        </div>
+      </div>
+
+      {/* Mağaza + iletişim bilgileri */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center gap-2 mb-5">
           <Store className="w-4 h-4 text-gray-500" />
-          <h3 className="font-semibold text-gray-900">Mağaza Bilgileri</h3>
+          <h3 className="font-semibold text-gray-900">Mağaza & İletişim</h3>
         </div>
-        <form onSubmit={saveShopName} className="space-y-4">
+        <form onSubmit={saveProfile} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Mağaza Adı</label>
-            <input type="text" value={shopName} onChange={(e) => setShopName(e.target.value)} required
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
+            <input
+              type="text"
+              value={shopName}
+              onChange={(e) => setShopName(e.target.value)}
+              placeholder="Örn: Ayşe Tekstil"
+              required
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+            />
           </div>
-          <div className="flex items-center gap-3">
-            <button type="submit" disabled={saving}
-              className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 transition-colors">
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? "Kaydediliyor..." : "Kaydet"}
-            </button>
-            {saved && <span className="flex items-center gap-1.5 text-sm text-green-600"><CheckCircle className="w-4 h-4" /> Kaydedildi</span>}
-          </div>
-        </form>
-      </div>
 
-      {/* Hesap bilgileri */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <User className="w-4 h-4 text-gray-500" />
-          <h3 className="font-semibold text-gray-900">Hesap Bilgileri</h3>
-        </div>
-        <div className="space-y-3">
           <div>
-            <p className="text-xs text-gray-500 mb-1">E-posta</p>
-            <p className="text-sm font-medium text-gray-900">{email}</p>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> E-posta</span>
+            </label>
+            <input
+              type="email"
+              value={email}
+              disabled
+              className="w-full px-4 py-2.5 border border-gray-100 rounded-xl text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
+            />
+            <p className="text-xs text-gray-400 mt-1">E-posta değişikliği için destek@saticipilot.com ile iletişime geç.</p>
           </div>
-          <p className="text-xs text-gray-400">E-posta adresini değiştirmek için destek ekibiyle iletişime geç.</p>
-        </div>
-      </div>
 
-      {/* Telefon */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <Phone className="w-4 h-4 text-gray-500" />
-          <h3 className="font-semibold text-gray-900">Telefon</h3>
-        </div>
-        <form onSubmit={savePhone} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Telefon Numarası</label>
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Telefon</span>
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               placeholder="05xxxxxxxxx"
-              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
-            <p className="text-xs text-gray-400 mt-1.5">SMS bildirimleri için kullanılır.</p>
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+            />
+            <p className="text-xs text-gray-400 mt-1">SMS bildirimleri için kullanılır.</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button type="submit" disabled={savingPhone}
-              className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 transition-colors">
-              {savingPhone && <Loader2 className="w-4 h-4 animate-spin" />}
-              {savingPhone ? "Kaydediliyor..." : "Kaydet"}
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 transition-colors"
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
             </button>
-            {savedPhone && <span className="flex items-center gap-1.5 text-sm text-green-600"><CheckCircle className="w-4 h-4" /> Kaydedildi</span>}
+            {saved && (
+              <span className="flex items-center gap-1.5 text-sm text-green-600">
+                <CheckCircle className="w-4 h-4" /> Kaydedildi
+              </span>
+            )}
           </div>
         </form>
       </div>
 
       {/* Bildirimler */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-5">
+        <div className="flex items-center gap-2 mb-1">
           <Bell className="w-4 h-4 text-gray-500" />
           <h3 className="font-semibold text-gray-900">Bildirimler</h3>
         </div>
+        <p className="text-xs text-gray-400 mb-5">Bildirimler <strong className="text-gray-600">{email}</strong> adresine gönderilir.</p>
         <div className="space-y-5">
           {TOGGLES.map((t) => (
-            <div key={t.key} className="flex items-center justify-between">
-              <div>
+            <div key={t.key} className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-800">{t.label}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{t.desc}</p>
               </div>
               <button
                 onClick={() => toggleNotif(t.key, !notifs[t.key])}
                 disabled={togglingKey === t.key}
-                className={`relative w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${notifs[t.key] ? "bg-orange-500" : "bg-gray-200"}`}
+                className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 ${notifs[t.key] ? "bg-orange-500" : "bg-gray-200"}`}
               >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifs[t.key] ? "translate-x-5" : "translate-x-0"}`} />
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifs[t.key] ? "translate-x-5" : "translate-x-0"}`}
+                />
               </button>
             </div>
           ))}
-          <p className="text-xs text-gray-400">Bildirimler <strong>{email}</strong> adresine gönderilir.</p>
         </div>
       </div>
 
       {/* Plan bilgisi */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <CreditCard className="w-4 h-4 text-gray-500" />
-          <h3 className="font-semibold text-gray-900">Aktif Plan</h3>
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <span className={`text-sm px-3 py-1 rounded-full font-semibold ${planColor[plan] ?? planColor.temel}`}>
-              {planLabel[plan] ?? plan}
-            </span>
-            <span className="text-sm text-gray-500">planındasınız</span>
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-gray-500" />
+            <h3 className="font-semibold text-gray-900">Aktif Plan</h3>
           </div>
-          <ul className="space-y-2">
-            {(planFeatures[plan] ?? planFeatures.temel).map((f) => (
-              <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                {f}
-              </li>
-            ))}
-          </ul>
-          {plan !== "marketing" && (
-            <a href="mailto:destek@saticipilot.com?subject=Plan Yükseltme" className="inline-block text-sm text-orange-600 font-medium hover:underline">
-              Planı yükselt →
-            </a>
-          )}
+          <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${planColor[plan] ?? planColor.temel}`}>
+            {planLabel[plan] ?? plan}
+          </span>
+        </div>
+        <ul className="space-y-2 mb-4">
+          {(planFeatures[plan] ?? planFeatures.temel).map((f) => (
+            <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
+              <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              {f}
+            </li>
+          ))}
+        </ul>
+        {plan !== "marketing" && (
+          <a
+            href="mailto:destek@saticipilot.com?subject=Plan Yükseltme"
+            className="inline-flex items-center gap-1.5 text-sm text-orange-600 font-medium hover:text-orange-700 transition-colors"
+          >
+            Planı yükselt <Globe className="w-3.5 h-3.5" />
+          </a>
+        )}
+      </div>
+
+      {/* Tehlike bölgesi */}
+      <div className="bg-white rounded-xl border border-red-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <AlertTriangle className="w-4 h-4 text-red-500" />
+          <h3 className="font-semibold text-red-700">Tehlike Bölgesi</h3>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium text-gray-800">Hesabı sil</p>
+            <p className="text-xs text-gray-400 mt-0.5">Tüm veriler kalıcı olarak silinir, geri alınamaz.</p>
+          </div>
+          <a
+            href="mailto:destek@saticipilot.com?subject=Hesap Silme Talebi"
+            className="flex-shrink-0 px-4 py-2 border border-red-300 text-red-600 text-sm font-medium rounded-lg hover:bg-red-50 transition-colors"
+          >
+            Talep gönder
+          </a>
         </div>
       </div>
     </div>
