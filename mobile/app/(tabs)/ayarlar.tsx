@@ -95,7 +95,7 @@ export default function AyarlarScreen() {
         <Text style={[styles.title, { color: t.text }]}>Ayarlar</Text>
 
         {/* Profile card */}
-        <View style={[styles.profileCard, { backgroundColor: t.card }]}>
+        <View style={[styles.profileCard, { backgroundColor: t.card, borderColor: t.borderStrong }]}>
           <View style={[styles.avatar, { backgroundColor: t.orange }]}>
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
@@ -127,7 +127,7 @@ export default function AyarlarScreen() {
 
         {/* Hesap */}
         <Text style={[styles.sectionLabel, { color: t.textMuted }]}>HESAP</Text>
-        <View style={[styles.card, { backgroundColor: t.card }]}>
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.borderStrong }]}>
           <InfoRow icon="mail-outline" label="E-posta" value={email} t={t} />
           <InfoRow icon="storefront-outline" label="Mağaza" value={shopName || "—"} t={t} />
           <TouchableOpacity onPress={() => router.push("/plan-yukselt")}>
@@ -137,7 +137,7 @@ export default function AyarlarScreen() {
 
         {/* Uygulama */}
         <Text style={[styles.sectionLabel, { color: t.textMuted }]}>UYGULAMA</Text>
-        <View style={[styles.card, { backgroundColor: t.card }]}>
+        <View style={[styles.card, { backgroundColor: t.card, borderColor: t.borderStrong }]}>
           <InfoRow icon="information-circle-outline" label="Versiyon" value="1.0.0" last t={t} />
         </View>
 
@@ -211,17 +211,13 @@ const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 40 },
   title: { fontSize: 22, fontWeight: "800", marginBottom: 20 },
   profileCard: {
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
     flexDirection: "row",
     alignItems: "center",
     gap: 16,
-    marginBottom: 28,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    marginBottom: 20,
+    borderWidth: 1,
   },
   avatar: {
     width: 56,
@@ -250,14 +246,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: "hidden",
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    marginBottom: 16,
+    borderWidth: 1,
   },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14 },
   rowLeft: { flexDirection: "row", alignItems: "center", gap: 10 },

@@ -143,7 +143,7 @@ export default function IadelerScreen() {
           const s = STATUS_STYLE[r.status];
           return (
             <TouchableOpacity
-              style={[styles.card, { backgroundColor: t.card, borderLeftColor: s?.color ?? t.border, borderLeftWidth: 3 }]}
+              style={[styles.card, { backgroundColor: t.card, borderColor: t.borderStrong, borderLeftColor: s?.color ?? t.borderStrong, borderLeftWidth: 3 }]}
               onPress={() => openReturn(r)}
               activeOpacity={0.75}
             >
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 13, fontWeight: "500" },
   filterTextActive: { color: "#fff", fontWeight: "700" },
   list: { padding: 16, gap: 12, paddingBottom: 32 },
-  card: { borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  card: { borderRadius: 14, padding: 16, borderWidth: 1 },
   cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
   product: { flex: 1, fontSize: 14, fontWeight: "700", marginRight: 8 },
   badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },

@@ -199,24 +199,24 @@ export default function DashboardScreen() {
           {kpis.map((k) => (
             <TouchableOpacity
               key={k.label}
-              style={[styles.kpiCard, { backgroundColor: k.bg }]}
+              style={[styles.kpiCard, { backgroundColor: t.card, borderColor: t.borderStrong }]}
               onPress={() => { Haptics.selectionAsync(); router.push(k.href as any); }}
               activeOpacity={0.8}
             >
-              <View style={styles.kpiTop}>
-                <Text style={[styles.kpiValue, { color: k.color }]}>{k.value}</Text>
-                <View style={[styles.kpiIconWrap, { backgroundColor: k.color + "20" }]}>
-                  <Ionicons name={k.icon} size={14} color={k.color} />
-                </View>
+              <View style={[styles.kpiIconWrap, { backgroundColor: k.bg }]}>
+                <Ionicons name={k.icon} size={18} color={k.color} />
               </View>
-              <Text style={[styles.kpiLabel, { color: k.color + "cc" }]}>{k.label}</Text>
+              <View style={styles.kpiInfo}>
+                <Text style={[styles.kpiLabel, { color: t.textMuted }]}>{k.label}</Text>
+                <Text style={[styles.kpiValue, { color: t.text }]}>{k.value}</Text>
+              </View>
             </TouchableOpacity>
           ))}
         </View>
 
         {/* Urgency action strip */}
         {(unreplied > 0 || pendingReturns > 0) && (
-          <View style={[styles.actionStrip, { backgroundColor: t.card }]}>
+          <View style={[styles.actionStrip, { backgroundColor: t.card, borderColor: t.borderStrong }]}>
             {unreplied > 0 && (
               <TouchableOpacity style={styles.actionItem} onPress={() => { Haptics.selectionAsync(); router.push("/(tabs)/yorumlar"); }}>
                 <View style={[styles.actionDot, { backgroundColor: "#8b5cf6" }]} />
@@ -241,16 +241,16 @@ export default function DashboardScreen() {
 
         {/* Hızlı erişim */}
         <View style={styles.quickRow}>
-          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card }]} onPress={() => router.push("/(tabs)/urunler")}>
+          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/(tabs)/urunler")}>
             <View style={[styles.quickIcon, { backgroundColor: "#eff6ff" }]}>
-              <Ionicons name="cube-outline" size={20} color="#3b82f6" />
+              <Ionicons name="cube-outline" size={18} color="#3b82f6" />
             </View>
             <Text style={[styles.quickLabel, { color: t.text }]}>Ürünlerim</Text>
             <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card }]} onPress={() => router.push("/(tabs)/istatistik")}>
+          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/(tabs)/istatistik")}>
             <View style={[styles.quickIcon, { backgroundColor: "#f0fdf4" }]}>
-              <Ionicons name="bar-chart-outline" size={20} color="#16a34a" />
+              <Ionicons name="bar-chart-outline" size={18} color="#16a34a" />
             </View>
             <Text style={[styles.quickLabel, { color: t.text }]}>Analiz</Text>
             <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
@@ -259,7 +259,7 @@ export default function DashboardScreen() {
 
         {/* Sparkline chart */}
         {totalReviews > 0 && (
-          <View style={[styles.chartCard, { backgroundColor: t.card }]}>
+          <View style={[styles.chartCard, { backgroundColor: t.card, borderColor: t.borderStrong }]}>
             <View style={styles.chartHeader}>
               <Text style={[styles.chartTitle, { color: t.text }]}>Son 7 Gün — Yorumlar</Text>
               <Text style={[styles.chartTotal, { color: t.orange }]}>{totalReviews} yorum</Text>
@@ -282,7 +282,7 @@ export default function DashboardScreen() {
               <Text style={styles.sectionCount}>{urgent.length}</Text>
             </View>
             {urgent.map((r) => (
-              <View key={r.id} style={[styles.reviewCard, { backgroundColor: t.card }]}>
+              <View key={r.id} style={[styles.reviewCard, { backgroundColor: t.card, borderColor: t.borderStrong }]}>
                 <View style={styles.reviewTop}>
                   <View style={{ flexDirection: "row", gap: 2 }}>
                     {[1, 2, 3, 4, 5].map((i) => (
@@ -293,13 +293,13 @@ export default function DashboardScreen() {
                     {new Date(r.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
                   </Text>
                 </View>
-                <Text style={[styles.reviewProduct, { color: t.textSub }]} numberOfLines={1}>{r.product_name}</Text>
+                <Text style={[styles.reviewProduct, { color: t.text }]} numberOfLines={1}>{r.product_name}</Text>
                 <Text style={[styles.reviewComment, { color: t.textSub }]} numberOfLines={2}>{r.comment}</Text>
               </View>
             ))}
           </View>
         ) : (
-          <View style={[styles.emptyBox, { backgroundColor: t.card }]}>
+          <View style={[styles.emptyBox, { backgroundColor: t.card, borderColor: t.border }]}>
             <Text style={styles.emptyIcon}>✅</Text>
             <Text style={[styles.emptyTitle, { color: t.text }]}>Her şey yolunda!</Text>
             <Text style={[styles.emptySubtitle, { color: t.textSub }]}>Cevaplanmayı bekleyen acil yorum yok.</Text>
@@ -320,22 +320,22 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontWeight: "700", fontSize: 16 },
   container: { padding: 16, paddingBottom: 40 },
-  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
-  kpiCard: { flex: 1, minWidth: "44%", borderRadius: 16, padding: 14 },
-  kpiTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 },
-  kpiValue: { fontSize: 26, fontWeight: "800" },
-  kpiIconWrap: { width: 26, height: 26, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
+  kpiCard: { flex: 1, minWidth: "47%", borderRadius: 14, padding: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+  kpiIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  kpiInfo: { flex: 1 },
+  kpiValue: { fontSize: 26, fontWeight: "800", marginTop: 2 },
   kpiLabel: { fontSize: 11, fontWeight: "600" },
-  actionStrip: { borderRadius: 16, overflow: "hidden", marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-  actionItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
-  actionDot: { width: 8, height: 8, borderRadius: 4 },
+  actionStrip: { borderRadius: 14, overflow: "hidden", marginBottom: 12, borderWidth: 1 },
+  actionItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 13 },
+  actionDot: { width: 7, height: 7, borderRadius: 4 },
   actionText: { flex: 1, fontSize: 13 },
   actionDivider: { height: 1, marginHorizontal: 16 },
-  quickRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
-  quickCard: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 14, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
-  quickIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  quickRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  quickCard: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 14, borderWidth: 1 },
+  quickIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   quickLabel: { flex: 1, fontSize: 13, fontWeight: "600" },
-  chartCard: { borderRadius: 16, padding: 16, marginBottom: 16, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  chartCard: { borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1 },
   chartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
   chartTitle: { fontSize: 14, fontWeight: "700" },
   chartTotal: { fontSize: 13, fontWeight: "700" },
@@ -346,12 +346,12 @@ const styles = StyleSheet.create({
   urgentDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#ef4444" },
   sectionTitle: { fontSize: 15, fontWeight: "700", flex: 1 },
   sectionCount: { fontSize: 13, color: "#ef4444", fontWeight: "700" },
-  reviewCard: { borderRadius: 14, padding: 14, borderLeftWidth: 3, borderLeftColor: "#ef4444", shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  reviewCard: { borderRadius: 14, padding: 14, borderWidth: 1, borderLeftWidth: 3, borderLeftColor: "#ef4444" },
   reviewTop: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
   reviewDate: { fontSize: 11 },
-  reviewProduct: { fontSize: 12, fontWeight: "600", marginBottom: 4 },
+  reviewProduct: { fontSize: 13, fontWeight: "700", marginBottom: 4 },
   reviewComment: { fontSize: 13, lineHeight: 18 },
-  emptyBox: { borderRadius: 20, padding: 32, alignItems: "center", gap: 6 },
+  emptyBox: { borderRadius: 16, padding: 32, alignItems: "center", gap: 6, borderWidth: 1 },
   emptyIcon: { fontSize: 36, marginBottom: 4 },
   emptyTitle: { fontSize: 16, fontWeight: "700" },
   emptySubtitle: { fontSize: 13, textAlign: "center" },
