@@ -1,12 +1,21 @@
 -- competitor_prices: tracks competitor product prices for price comparison
+-- If you already ran an earlier version of this file that had "product_name",
+-- run these ALTER statements first, then skip the CREATE TABLE below:
+--
+--   alter table competitor_prices rename column product_name to our_product_name;
+--   alter table competitor_prices add column if not exists our_product_id text not null default '';
+--   alter table competitor_prices add column if not exists category text;
+
 create table if not exists competitor_prices (
   id uuid primary key default gen_random_uuid(),
   seller_id uuid references sellers(id) on delete cascade not null,
-  product_name text not null,
+  our_product_id text not null,
+  our_product_name text not null,
   our_price numeric(10,2) not null,
   competitor_name text not null,
   competitor_product_name text,
   competitor_price numeric(10,2) not null,
+  category text,
   checked_at timestamptz default now(),
   created_at timestamptz default now()
 );

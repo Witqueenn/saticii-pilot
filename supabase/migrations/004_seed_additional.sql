@@ -14,82 +14,82 @@
 -- Shows mix of: pahalı (we're pricier), uygun (±5%), ucuz (we're cheaper)
 -- ---------------------------------------------------------------
 insert into public.competitor_prices
-  (seller_id, product_name, our_price, competitor_name, competitor_product_name, competitor_price, checked_at)
+  (seller_id, our_product_id, our_product_name, our_price, competitor_name, competitor_product_name, competitor_price, category, checked_at)
 values
 
   -- Blazer Ceket (549.90) — biz orta konumdayız
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-blazer',
     'Kadın Oversize Blazer Ceket - Ekru',
-    549.90, 'Mavi', 'Oversize Blazer Ceket Ekru', 529.90,
+    549.90, 'Mavi', 'Oversize Blazer Ceket Ekru', 529.90, 'Ceket',
     now() - interval '2 hours'
   ),
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-blazer',
     'Kadın Oversize Blazer Ceket - Ekru',
-    549.90, 'Zara', 'Blazer Kruvaze Ceket', 599.90,
+    549.90, 'Zara', 'Blazer Kruvaze Ceket', 599.90, 'Ceket',
     now() - interval '2 hours'
   ),
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-blazer',
     'Kadın Oversize Blazer Ceket - Ekru',
-    549.90, 'H&M', 'Oversize Ceket Bej', 549.00,
+    549.90, 'H&M', 'Oversize Ceket Bej', 549.00, 'Ceket',
     now() - interval '2 hours'
   ),
 
   -- Kaşkorse Elbise (299.90) — rakipler daha ucuz, dikkat!
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-kaskorse',
     'Ribana Kaşkorse Elbise - Siyah',
-    299.90, 'LC Waikiki', 'Kaşkorse Elbise Siyah', 249.90,
+    299.90, 'LC Waikiki', 'Kaşkorse Elbise Siyah', 249.90, 'Elbise',
     now() - interval '45 minutes'
   ),
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-kaskorse',
     'Ribana Kaşkorse Elbise - Siyah',
-    299.90, 'DeFacto', 'Kaşkorse Mini Elbise', 279.90,
+    299.90, 'DeFacto', 'Kaşkorse Mini Elbise', 279.90, 'Elbise',
     now() - interval '45 minutes'
   ),
 
   -- Keten Pantolon (389.90) — biz daha uygunuz, avantajlı konum
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-pantolon',
     'Kadın Keten Pantolon - Bej',
-    389.90, 'Koton', 'Keten Pantolon Bej', 419.90,
+    389.90, 'Koton', 'Keten Pantolon Bej', 419.90, 'Pantolon',
     now() - interval '6 hours'
   ),
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-pantolon',
     'Kadın Keten Pantolon - Bej',
-    389.90, 'Mavi', 'Beli Lastikli Keten Pantolon', 399.90,
+    389.90, 'Mavi', 'Beli Lastikli Keten Pantolon', 399.90, 'Pantolon',
     now() - interval '6 hours'
   ),
 
   -- Deri Tayt (179.90) — rakipler biraz daha ucuz
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-tayt',
     'Deri Görünümlü Tayt - Siyah',
-    179.90, 'LC Waikiki', 'Deri Görünümlü Tayt', 169.90,
+    179.90, 'LC Waikiki', 'Deri Görünümlü Tayt', 169.90, 'Tayt',
     now() - interval '1 day'
   ),
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-tayt',
     'Deri Görünümlü Tayt - Siyah',
-    179.90, 'DeFacto', 'Push-up Deri Tayt', 159.90,
+    179.90, 'DeFacto', 'Push-up Deri Tayt', 159.90, 'Tayt',
     now() - interval '1 day'
   ),
 
   -- Crop Kazak (249.90) — rekabetçi konumdayız
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-kazak',
     'Crop Triko Kazak - Camel',
-    249.90, 'H&M', 'Crop Triko Kazak', 259.90,
+    249.90, 'H&M', 'Crop Triko Kazak', 259.90, 'Kazak',
     now() - interval '3 hours'
   ),
   (
-    'YOUR-USER-ID',
+    'YOUR-USER-ID', 'prod-kazak',
     'Crop Triko Kazak - Camel',
-    249.90, 'Koton', 'Triko Crop Kazak Camel', 239.90,
+    249.90, 'Koton', 'Triko Crop Kazak Camel', 239.90, 'Kazak',
     now() - interval '3 hours'
   );
 
