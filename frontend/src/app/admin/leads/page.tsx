@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Target, ExternalLink, ChevronDown, X, Check, Loader2 } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Plus, Target, ExternalLink, ChevronDown, X, Check, Loader2, LayoutList, Columns3, Phone, Mail } from "lucide-react";
 
 interface Lead {
   id: string;
@@ -18,12 +18,12 @@ interface Lead {
 }
 
 const STATUSES = [
-  { key: "kesfedildi", label: "Keşfedildi", color: "bg-gray-100 text-gray-600" },
-  { key: "ulasildi",   label: "Ulaşıldı",   color: "bg-blue-100 text-blue-700" },
-  { key: "demo",       label: "Demo",        color: "bg-purple-100 text-purple-700" },
-  { key: "deneme",     label: "Deneme",      color: "bg-orange-100 text-orange-700" },
-  { key: "musteri",    label: "Müşteri",     color: "bg-green-100 text-green-700" },
-  { key: "kayip",      label: "Kayıp",       color: "bg-red-100 text-red-700" },
+  { key: "kesfedildi", label: "Keşfedildi",  color: "bg-gray-100 text-gray-600",    dot: "bg-gray-400" },
+  { key: "ulasildi",   label: "Ulaşıldı",    color: "bg-blue-100 text-blue-700",    dot: "bg-blue-500" },
+  { key: "demo",       label: "Demo",         color: "bg-purple-100 text-purple-700",dot: "bg-purple-500" },
+  { key: "deneme",     label: "Deneme",       color: "bg-orange-100 text-orange-700",dot: "bg-orange-500" },
+  { key: "musteri",    label: "Müşteri",      color: "bg-green-100 text-green-700",  dot: "bg-green-500" },
+  { key: "kayip",      label: "Kayıp",        color: "bg-red-100 text-red-700",      dot: "bg-red-400" },
 ];
 
 const MARKETPLACES = ["trendyol", "hepsiburada", "n11", "amazon", "ciceksepeti", "diğer"];
@@ -38,9 +38,115 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s?.color ?? "bg-gray-100 text-gray-600"}`}>{s?.label ?? status}</span>;
 }
 
+// ── Kanban Board ──────────────────────────────────────────────
+function KanbanBoard({
+  leads, onEdit, onStatusChange,
+}: {
+  leads: Lead[];
+  onEdit: (lead: Lead) => void;
+  onStatusChange: (id: string, status: string) => void;
+}) {
+  const draggingId = useRef<string | null>(null);
+  const [overColumn, setOverColumn] = useState<string | null>(null);
+  const [localLeads, setLocalLeads] = useState(leads);
+
+  useEffect(() => { setLocalLeads(leads); }, [leads]);
+
+  function handleDrop(colKey: string) {
+    const id = draggingId.current;
+    if (!id) return;
+    const lead = localLeads.find((l) => l.id === id);
+    if (!lead || lead.status === colKey) return;
+    setLocalLeads((prev) => prev.map((l) => l.id === id ? { ...l, status: colKey } : l));
+    onStatusChange(id, colKey);
+  }
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-4 -mx-1 px-1">
+      {STATUSES.map((col) => {
+        const colLeads = localLeads.filter((l) => l.status === col.key);
+        const isOver = overColumn === col.key;
+        return (
+          <div
+            key={col.key}
+            className={`flex-shrink-0 w-56 rounded-xl transition-all ${isOver ? "bg-orange-50 ring-2 ring-orange-300" : "bg-gray-50"}`}
+            onDragOver={(e) => { e.preventDefault(); setOverColumn(col.key); }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverColumn(null);
+            }}
+            onDrop={(e) => { e.preventDefault(); handleDrop(col.key); setOverColumn(null); draggingId.current = null; }}
+          >
+            {/* Column header */}
+            <div className="flex items-center justify-between px-3 pt-3 pb-2">
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${col.color}`}>{col.label}</span>
+              <span className="text-xs font-bold text-gray-400 tabular-nums">{colLeads.length}</span>
+            </div>
+
+            {/* Cards */}
+            <div className="px-2 pb-2 space-y-2 min-h-[80px]">
+              {colLeads.map((lead) => (
+                <div
+                  key={lead.id}
+                  draggable
+                  onDragStart={(e) => {
+                    draggingId.current = lead.id;
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragEnd={() => { draggingId.current = null; setOverColumn(null); }}
+                  onClick={() => onEdit(lead)}
+                  className="bg-white rounded-lg border border-gray-200 p-3 cursor-grab active:cursor-grabbing hover:border-orange-200 hover:shadow-sm transition-all select-none"
+                >
+                  <div className="flex items-start justify-between gap-1 mb-1">
+                    <p className="text-sm font-semibold text-gray-900 leading-tight line-clamp-2">{lead.shop_name}</p>
+                    {lead.store_url && (
+                      <a
+                        href={lead.store_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-gray-300 hover:text-orange-500 flex-shrink-0 mt-0.5"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-gray-400 capitalize mb-1.5">{lead.marketplace}</p>
+                  {lead.contact_email && (
+                    <div className="flex items-center gap-1 text-[11px] text-blue-500 truncate">
+                      <Mail className="w-2.5 h-2.5 flex-shrink-0" />
+                      <span className="truncate">{lead.contact_email}</span>
+                    </div>
+                  )}
+                  {lead.contact_phone && (
+                    <div className="flex items-center gap-1 text-[11px] text-gray-400 mt-0.5">
+                      <Phone className="w-2.5 h-2.5 flex-shrink-0" />
+                      <span>{lead.contact_phone}</span>
+                    </div>
+                  )}
+                  {lead.notes && (
+                    <p className="text-[11px] text-gray-400 mt-1.5 line-clamp-2 italic">{lead.notes}</p>
+                  )}
+                </div>
+              ))}
+
+              {colLeads.length === 0 && (
+                <div className={`rounded-lg border-2 border-dashed h-14 flex items-center justify-center transition-colors ${isOver ? "border-orange-300 bg-orange-50/50" : "border-gray-200"}`}>
+                  <span className="text-xs text-gray-300">Buraya sürükle</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<"list" | "kanban">("kanban");
   const [filterStatus, setFilterStatus] = useState("hepsi");
   const [showModal, setShowModal] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
@@ -73,15 +179,10 @@ export default function LeadsPage() {
     if (!form.shop_name.trim()) return;
     setSaving(true);
     const payload = {
-      shop_name: form.shop_name.trim(),
-      marketplace: form.marketplace,
-      contact_name: form.contact_name || null,
-      contact_email: form.contact_email || null,
-      contact_phone: form.contact_phone || null,
-      store_url: form.store_url || null,
-      status: form.status,
-      source: form.source || null,
-      notes: form.notes || null,
+      shop_name: form.shop_name.trim(), marketplace: form.marketplace,
+      contact_name: form.contact_name || null, contact_email: form.contact_email || null,
+      contact_phone: form.contact_phone || null, store_url: form.store_url || null,
+      status: form.status, source: form.source || null, notes: form.notes || null,
     };
     if (editLead) {
       await fetch("/api/admin/leads", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editLead.id, ...payload }) });
@@ -114,27 +215,45 @@ export default function LeadsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-w-6xl">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">BD & Leads</h2>
           <p className="text-gray-500 mt-1">Potansiyel müşteri takibi</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-600 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Lead Ekle
-        </button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
+            <button
+              onClick={() => setView("kanban")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${view === "kanban" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              <Columns3 className="w-3.5 h-3.5" /> Kanban
+            </button>
+            <button
+              onClick={() => setView("list")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${view === "list" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              <LayoutList className="w-3.5 h-3.5" /> Liste
+            </button>
+          </div>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-600 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Lead Ekle
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Toplam Lead", value: stats.total, color: "text-gray-900" },
-          { label: "Aktif Pipeline", value: stats.active, color: "text-orange-600" },
+          { label: "Toplam Lead",      value: stats.total,   color: "text-gray-900" },
+          { label: "Aktif Pipeline",   value: stats.active,  color: "text-orange-600" },
           { label: "Müşteriye Döndü", value: stats.musteri, color: "text-green-600" },
-          { label: "Kayıp", value: stats.kayip, color: "text-red-500" },
+          { label: "Kayıp",            value: stats.kayip,   color: "text-red-500" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4">
             <p className={`text-2xl font-bold ${s.color}`}>{loading ? "—" : s.value}</p>
@@ -143,118 +262,115 @@ export default function LeadsPage() {
         ))}
       </div>
 
-      {/* Pipeline görünümü */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-        {STATUSES.map((s) => {
-          const count = leads.filter((l) => l.status === s.key).length;
-          return (
-            <button
-              key={s.key}
-              onClick={() => setFilterStatus(filterStatus === s.key ? "hepsi" : s.key)}
-              className={`rounded-xl border p-3 text-left transition-all ${filterStatus === s.key ? "border-orange-400 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}
-            >
-              <p className="text-lg font-bold text-gray-900">{count}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Liste */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
-          <Target className="w-4 h-4 text-gray-400" />
-          <span className="text-sm font-semibold text-gray-700">{filtered.length} lead</span>
+      {loading ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400 text-sm">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-gray-300" />
+          Yükleniyor...
         </div>
-
-        {loading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Yükleniyor...</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Lead bulunamadı.</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {filtered.map((lead) => (
-              <div key={lead.id}>
-                <div
-                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => setExpandedId(expandedId === lead.id ? null : lead.id)}
+      ) : view === "kanban" ? (
+        /* ── Kanban ── */
+        <KanbanBoard leads={leads} onEdit={openEdit} onStatusChange={updateStatus} />
+      ) : (
+        /* ── Liste ── */
+        <>
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+            {STATUSES.map((s) => {
+              const count = leads.filter((l) => l.status === s.key).length;
+              return (
+                <button
+                  key={s.key}
+                  onClick={() => setFilterStatus(filterStatus === s.key ? "hepsi" : s.key)}
+                  className={`rounded-xl border p-3 text-left transition-all ${filterStatus === s.key ? "border-orange-400 bg-orange-50" : "border-gray-200 bg-white hover:border-gray-300"}`}
                 >
-                  {/* Mağaza */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-gray-900">{lead.shop_name}</span>
-                      <span className="text-xs text-gray-400 capitalize">{lead.marketplace}</span>
-                      {lead.store_url && (
-                        <a
-                          href={lead.store_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-orange-500 hover:text-orange-600"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                    {lead.contact_email && (
-                      <p className="text-xs text-gray-400 mt-0.5">{lead.contact_email}</p>
-                    )}
-                  </div>
-
-                  {/* Status dropdown */}
-                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <StatusBadge status={lead.status} />
-                    <div className="relative group">
-                      <button className="p-1 text-gray-300 hover:text-gray-500 transition-colors">
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </button>
-                      <div className="absolute right-0 top-6 z-10 bg-white rounded-xl border border-gray-200 shadow-lg p-1 w-36 hidden group-hover:block">
-                        {STATUSES.map((s) => (
-                          <button
-                            key={s.key}
-                            onClick={() => updateStatus(lead.id, s.key)}
-                            className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 hover:bg-gray-50 ${lead.status === s.key ? "text-orange-600" : "text-gray-700"}`}
-                          >
-                            {lead.status === s.key && <Check className="w-3 h-3" />}
-                            {lead.status !== s.key && <span className="w-3" />}
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <span className="text-xs text-gray-400 flex-shrink-0">
-                    {new Date(lead.created_at).toLocaleDateString("tr-TR")}
-                  </span>
-                </div>
-
-                {/* Expanded detail */}
-                {expandedId === lead.id && (
-                  <div className="px-5 pb-4 bg-gray-50 border-t border-gray-100 space-y-3">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-3">
-                      {lead.contact_name && <div><p className="text-xs text-gray-400">İletişim</p><p className="text-sm text-gray-700">{lead.contact_name}</p></div>}
-                      {lead.contact_phone && <div><p className="text-xs text-gray-400">Telefon</p><p className="text-sm text-gray-700">{lead.contact_phone}</p></div>}
-                      {lead.source && <div><p className="text-xs text-gray-400">Kaynak</p><p className="text-sm text-gray-700">{lead.source}</p></div>}
-                    </div>
-                    {lead.notes && (
-                      <div>
-                        <p className="text-xs text-gray-400 mb-1">Notlar</p>
-                        <p className="text-sm text-gray-700 bg-white rounded-lg border border-gray-200 px-3 py-2 whitespace-pre-wrap">{lead.notes}</p>
-                      </div>
-                    )}
-                    <div className="flex gap-2 pt-1">
-                      <button onClick={() => openEdit(lead)} className="text-xs text-orange-600 font-semibold hover:underline">Düzenle</button>
-                      <span className="text-gray-300">·</span>
-                      <button onClick={() => deleteLead(lead.id)} className="text-xs text-red-500 hover:underline">Sil</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                  <p className="text-lg font-bold text-gray-900">{count}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                </button>
+              );
+            })}
           </div>
-        )}
-      </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+              <Target className="w-4 h-4 text-gray-400" />
+              <span className="text-sm font-semibold text-gray-700">{filtered.length} lead</span>
+            </div>
+
+            {filtered.length === 0 ? (
+              <div className="p-8 text-center text-gray-400 text-sm">Lead bulunamadı.</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {filtered.map((lead) => (
+                  <div key={lead.id}>
+                    <div
+                      className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => setExpandedId(expandedId === lead.id ? null : lead.id)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-gray-900">{lead.shop_name}</span>
+                          <span className="text-xs text-gray-400 capitalize">{lead.marketplace}</span>
+                          {lead.store_url && (
+                            <a href={lead.store_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-orange-500 hover:text-orange-600">
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                        {lead.contact_email && <p className="text-xs text-gray-400 mt-0.5">{lead.contact_email}</p>}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <StatusBadge status={lead.status} />
+                        <div className="relative group">
+                          <button className="p-1 text-gray-300 hover:text-gray-500 transition-colors">
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="absolute right-0 top-6 z-10 bg-white rounded-xl border border-gray-200 shadow-lg p-1 w-36 hidden group-hover:block">
+                            {STATUSES.map((s) => (
+                              <button
+                                key={s.key}
+                                onClick={() => updateStatus(lead.id, s.key)}
+                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 hover:bg-gray-50 ${lead.status === s.key ? "text-orange-600" : "text-gray-700"}`}
+                              >
+                                {lead.status === s.key ? <Check className="w-3 h-3" /> : <span className="w-3" />}
+                                {s.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <span className="text-xs text-gray-400 flex-shrink-0">
+                        {new Date(lead.created_at).toLocaleDateString("tr-TR")}
+                      </span>
+                    </div>
+
+                    {expandedId === lead.id && (
+                      <div className="px-5 pb-4 bg-gray-50 border-t border-gray-100 space-y-3">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-3">
+                          {lead.contact_name && <div><p className="text-xs text-gray-400">İletişim</p><p className="text-sm text-gray-700">{lead.contact_name}</p></div>}
+                          {lead.contact_phone && <div><p className="text-xs text-gray-400">Telefon</p><p className="text-sm text-gray-700">{lead.contact_phone}</p></div>}
+                          {lead.source && <div><p className="text-xs text-gray-400">Kaynak</p><p className="text-sm text-gray-700">{lead.source}</p></div>}
+                        </div>
+                        {lead.notes && (
+                          <div>
+                            <p className="text-xs text-gray-400 mb-1">Notlar</p>
+                            <p className="text-sm text-gray-700 bg-white rounded-lg border border-gray-200 px-3 py-2 whitespace-pre-wrap">{lead.notes}</p>
+                          </div>
+                        )}
+                        <div className="flex gap-2 pt-1">
+                          <button onClick={() => openEdit(lead)} className="text-xs text-orange-600 font-semibold hover:underline">Düzenle</button>
+                          <span className="text-gray-300">·</span>
+                          <button onClick={() => deleteLead(lead.id)} className="text-xs text-red-500 hover:underline">Sil</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Modal */}
       {showModal && (
@@ -269,112 +385,64 @@ export default function LeadsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Mağaza Adı *</label>
-                  <input
-                    value={form.shop_name}
-                    onChange={(e) => setForm({ ...form, shop_name: e.target.value })}
-                    placeholder="Ayşe'nin Butik"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                  />
+                  <input value={form.shop_name} onChange={(e) => setForm({ ...form, shop_name: e.target.value })} placeholder="Ayşe'nin Butik"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Platform</label>
-                  <select
-                    value={form.marketplace}
-                    onChange={(e) => setForm({ ...form, marketplace: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                  >
+                  <select value={form.marketplace} onChange={(e) => setForm({ ...form, marketplace: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50">
                     {MARKETPLACES.map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Durum</label>
-                  <select
-                    value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                  >
+                  <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50">
                     {STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
                   </select>
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">İletişim Adı</label>
-                  <input
-                    value={form.contact_name}
-                    onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
-                    placeholder="Ayşe Kaya"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                  />
+                  <input value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} placeholder="Ayşe Kaya"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={form.contact_email}
-                    onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
-                    placeholder="ayse@ornek.com"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                  />
+                  <input type="email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} placeholder="ayse@ornek.com"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Telefon</label>
-                  <input
-                    value={form.contact_phone}
-                    onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
-                    placeholder="0532 000 00 00"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                  />
+                  <input value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} placeholder="0532 000 00 00"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
                 </div>
-
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Kaynak</label>
-                  <input
-                    value={form.source}
-                    onChange={(e) => setForm({ ...form, source: e.target.value })}
-                    placeholder="LinkedIn, Trendyol arama, referans..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                  />
+                  <input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="LinkedIn, Trendyol arama, referans..."
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
                 </div>
-
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Mağaza URL</label>
-                  <input
-                    value={form.store_url}
-                    onChange={(e) => setForm({ ...form, store_url: e.target.value })}
-                    placeholder="https://www.trendyol.com/magaza/..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-                  />
+                  <input value={form.store_url} onChange={(e) => setForm({ ...form, store_url: e.target.value })} placeholder="https://www.trendyol.com/magaza/..."
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
                 </div>
-
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Notlar</label>
-                  <textarea
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    rows={3}
+                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3}
                     placeholder="Görüşme notları, ilgi alanları, takip tarihi..."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 resize-none"
-                  />
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 resize-none" />
                 </div>
               </div>
             </div>
 
             <div className="flex gap-3 p-6 border-t border-gray-100">
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
+              <button onClick={() => setShowModal(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                 İptal
               </button>
-              <button
-                onClick={save}
-                disabled={saving || !form.shop_name.trim()}
-                className="flex-1 flex items-center justify-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors"
-              >
+              <button onClick={save} disabled={saving || !form.shop_name.trim()}
+                className="flex-1 flex items-center justify-center gap-2 bg-orange-500 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editLead ? "Kaydet" : "Ekle"}
               </button>

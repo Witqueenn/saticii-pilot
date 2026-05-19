@@ -17,17 +17,16 @@ interface Product {
   ai_suggestions: string[] | null;
 }
 
-function ScoreBar({ score }: { score: number }) {
-  const color = score >= 70 ? "bg-green-500" : score >= 50 ? "bg-yellow-500" : "bg-red-500";
+function ScorePill({ score, label }: { score: number; label: string }) {
+  const cls = score >= 70
+    ? "bg-green-100 text-green-700"
+    : score >= 50
+    ? "bg-yellow-100 text-yellow-700"
+    : "bg-red-100 text-red-700";
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 bg-gray-100 rounded-full h-2">
-        <div className={`${color} h-2 rounded-full transition-all`} style={{ width: `${score}%` }} />
-      </div>
-      <span className={`text-sm font-semibold w-8 ${score >= 70 ? "text-green-600" : score >= 50 ? "text-yellow-600" : "text-red-600"}`}>
-        {score}
-      </span>
-    </div>
+    <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${cls}`}>
+      {label} {score}
+    </span>
   );
 }
 
@@ -121,37 +120,35 @@ export default function UrunlerPage() {
         <div className="space-y-4">
           {filtered.map((p) => (
             <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Package className="w-4 h-4 text-gray-400" />
+                </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-gray-900 truncate">{p.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 truncate">{p.category}</p>
-                </div>
-                <div className="flex items-center gap-2 text-right flex-shrink-0">
-                  {p.price && (
-                    <span className="text-sm font-semibold text-gray-700">
-                      {p.price.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
-                    </span>
-                  )}
-                  {p.return_rate !== null && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      p.return_rate > 20 ? "bg-red-100 text-red-700" :
-                      p.return_rate > 10 ? "bg-yellow-100 text-yellow-700" :
-                      "bg-green-100 text-green-700"
-                    }`}>
-                      %{p.return_rate} iade
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1.5">İçerik Puanı</p>
-                  <ScoreBar score={p.description_score ?? 0} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1.5">SEO Puanı</p>
-                  <ScoreBar score={p.seo_score ?? 0} />
+                  <div className="flex items-start justify-between gap-2 flex-wrap">
+                    <p className="font-medium text-gray-900 truncate">{p.name}</p>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
+                      <ScorePill score={p.description_score ?? 0} label="İçerik" />
+                      <ScorePill score={p.seo_score ?? 0} label="SEO" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <p className="text-xs text-gray-400 truncate">{p.category}</p>
+                    {p.price && (
+                      <span className="text-xs text-gray-500 font-medium">
+                        {p.price.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}
+                      </span>
+                    )}
+                    {p.return_rate !== null && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        p.return_rate > 20 ? "bg-red-100 text-red-700" :
+                        p.return_rate > 10 ? "bg-yellow-100 text-yellow-700" :
+                        "bg-green-100 text-green-700"
+                      }`}>
+                        %{p.return_rate} iade
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 

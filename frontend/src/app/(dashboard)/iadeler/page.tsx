@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { RotateCcw, Upload, X, Download, FileText, CheckCircle, Loader2, AlertTriangle } from "lucide-react";
+import { RotateCcw, Upload, X, Download, FileText, CheckCircle, Loader2, AlertTriangle, Sparkles } from "lucide-react";
 import { Skeleton } from "@/components/Skeleton";
 
 interface Return {
@@ -117,6 +117,48 @@ function downloadSampleCSV() {
   a.download = "iade_sablonu.csv";
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function AIPatternCard({ returns }: { returns: Return[] }) {
+  const totalByReason: Record<string, number> = {};
+  returns.forEach((r) => {
+    totalByReason[r.reason] = (totalByReason[r.reason] ?? 0) + 1;
+  });
+
+  const sorted = Object.entries(totalByReason).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) return null;
+
+  const [topReason, topCount] = sorted[0];
+  const pct = Math.round((topCount / returns.length) * 100);
+  const productsWithTop = new Set(
+    returns.filter((r) => r.reason === topReason).map((r) => r.product_name)
+  ).size;
+
+  return (
+    <div className="bg-white rounded-xl border border-dashed border-orange-300 p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 bg-orange-50 rounded-lg flex items-center justify-center">
+          <Sparkles className="w-4 h-4 text-orange-500" />
+        </div>
+        <p className="text-sm font-semibold text-gray-700">AI Kalıp Tespiti</p>
+        <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">
+          {sorted.length} sebep
+        </span>
+      </div>
+      <div className="bg-gray-50 rounded-xl p-4 text-sm leading-relaxed space-y-2">
+        <p className="text-gray-700">
+          İadelerin{" "}
+          <span className="font-semibold text-gray-900">
+            %{pct}'i {reasonLabel[topReason] ?? topReason} kaynaklı.
+          </span>
+          {productsWithTop > 1 && ` ${productsWithTop} farklı üründe aynı sorun tekrarlıyor.`}
+        </p>
+        <p className="text-xs text-gray-500">
+          {reasonRecommendation[topReason] ?? reasonRecommendation.diger}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function buildPatterns(returns: Return[]): Pattern[] {
@@ -286,6 +328,8 @@ export default function IadelerPage() {
         </div>
       ) : (
         <>
+          <AIPatternCard returns={returns} />
+
           {/* Genel sebep dağılımı */}
           {returns.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
