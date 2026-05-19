@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Plus, Target, ExternalLink, ChevronDown, X, Check, Loader2, LayoutList, Columns3, Phone, Mail } from "lucide-react";
+import { Plus, Target, ExternalLink, ChevronDown, X, Check, Loader2, LayoutList, Columns3, Phone, Mail, Search, Copy } from "lucide-react";
 
 interface Lead {
   id: string;
@@ -18,13 +18,20 @@ interface Lead {
 }
 
 const STATUSES = [
-  { key: "kesfedildi", label: "Keşfedildi",  color: "bg-gray-100 text-gray-600",    dot: "bg-gray-400" },
-  { key: "ulasildi",   label: "Ulaşıldı",    color: "bg-blue-100 text-blue-700",    dot: "bg-blue-500" },
-  { key: "demo",       label: "Demo",         color: "bg-purple-100 text-purple-700",dot: "bg-purple-500" },
-  { key: "deneme",     label: "Deneme",       color: "bg-orange-100 text-orange-700",dot: "bg-orange-500" },
-  { key: "musteri",    label: "Müşteri",      color: "bg-green-100 text-green-700",  dot: "bg-green-500" },
-  { key: "kayip",      label: "Kayıp",        color: "bg-red-100 text-red-700",      dot: "bg-red-400" },
+  { key: "kesfedildi", label: "Keşfedildi",  color: "bg-gray-100 text-gray-600",     dot: "bg-gray-400" },
+  { key: "ulasildi",   label: "Ulaşıldı",    color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500" },
+  { key: "demo",       label: "Demo",         color: "bg-purple-100 text-purple-700", dot: "bg-purple-500" },
+  { key: "deneme",     label: "Deneme",       color: "bg-orange-100 text-orange-700", dot: "bg-orange-500" },
+  { key: "musteri",    label: "Müşteri",      color: "bg-green-100 text-green-700",   dot: "bg-green-500" },
+  { key: "kayip",      label: "Kayıp",        color: "bg-red-100 text-red-700",       dot: "bg-red-400" },
 ];
+
+const SOURCE_STYLE: Record<string, { label: string; color: string }> = {
+  instagram: { label: "Instagram", color: "bg-pink-50 text-pink-600 border-pink-200" },
+  website:   { label: "Website",   color: "bg-sky-50 text-sky-600 border-sky-200" },
+  linkedin:  { label: "LinkedIn",  color: "bg-blue-50 text-blue-700 border-blue-200" },
+  referans:  { label: "Referans",  color: "bg-green-50 text-green-700 border-green-200" },
+};
 
 const MARKETPLACES = ["trendyol", "hepsiburada", "n11", "amazon", "ciceksepeti", "diğer"];
 
@@ -33,9 +40,59 @@ const EMPTY_FORM = {
   contact_phone: "", store_url: "", status: "kesfedildi", source: "", notes: "",
 };
 
+function parseNiche(notes: string | null): string | null {
+  if (!notes) return null;
+  const m = notes.match(/Niche:\s*([^·\n]+)/);
+  return m ? m[1].trim() : null;
+}
+
+function parseIG(notes: string | null): string | null {
+  if (!notes) return null;
+  const m = notes.match(/(\d+\.?\d*[KMk])\s*IG/);
+  return m ? m[1] : null;
+}
+
+function parseUseCase(notes: string | null): string | null {
+  if (!notes) return null;
+  const idx = notes.indexOf("SatıcıPilot");
+  if (idx === -1) return null;
+  const before = notes.substring(0, idx);
+  const cut = Math.max(before.lastIndexOf("·"), before.lastIndexOf("."));
+  return notes.substring(cut + 1).trim();
+}
+
 function StatusBadge({ status }: { status: string }) {
   const s = STATUSES.find((s) => s.key === status);
-  return <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s?.color ?? "bg-gray-100 text-gray-600"}`}>{s?.label ?? status}</span>;
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s?.color ?? "bg-gray-100 text-gray-600"}`}>
+      {s?.label ?? status}
+    </span>
+  );
+}
+
+function SourceBadge({ source }: { source: string | null }) {
+  if (!source) return null;
+  const style = SOURCE_STYLE[source.toLowerCase()];
+  return (
+    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${style?.color ?? "bg-gray-50 text-gray-500 border-gray-200"}`}>
+      {style?.label ?? source}
+    </span>
+  );
+}
+
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  function copy(e: React.MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+  return (
+    <button onClick={copy} className="text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0">
+      {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+    </button>
+  );
 }
 
 // ── Kanban Board ──────────────────────────────────────────────
@@ -69,65 +126,93 @@ function KanbanBoard({
         return (
           <div
             key={col.key}
-            className={`flex-shrink-0 w-56 rounded-xl transition-all ${isOver ? "bg-orange-50 ring-2 ring-orange-300" : "bg-gray-50"}`}
+            className={`flex-shrink-0 w-64 rounded-xl transition-all ${isOver ? "bg-orange-50 ring-2 ring-orange-300" : "bg-gray-50"}`}
             onDragOver={(e) => { e.preventDefault(); setOverColumn(col.key); }}
             onDragLeave={(e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverColumn(null);
             }}
             onDrop={(e) => { e.preventDefault(); handleDrop(col.key); setOverColumn(null); draggingId.current = null; }}
           >
-            {/* Column header */}
             <div className="flex items-center justify-between px-3 pt-3 pb-2">
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${col.color}`}>{col.label}</span>
               <span className="text-xs font-bold text-gray-400 tabular-nums">{colLeads.length}</span>
             </div>
 
-            {/* Cards */}
             <div className="px-2 pb-2 space-y-2 min-h-[80px]">
-              {colLeads.map((lead) => (
-                <div
-                  key={lead.id}
-                  draggable
-                  onDragStart={(e) => {
-                    draggingId.current = lead.id;
-                    e.dataTransfer.effectAllowed = "move";
-                  }}
-                  onDragEnd={() => { draggingId.current = null; setOverColumn(null); }}
-                  onClick={() => onEdit(lead)}
-                  className="bg-white rounded-lg border border-gray-200 p-3 cursor-grab active:cursor-grabbing hover:border-orange-200 hover:shadow-sm transition-all select-none"
-                >
-                  <div className="flex items-start justify-between gap-1 mb-1">
-                    <p className="text-sm font-semibold text-gray-900 leading-tight line-clamp-2">{lead.shop_name}</p>
-                    {lead.store_url && (
-                      <a
-                        href={lead.store_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-gray-300 hover:text-orange-500 flex-shrink-0 mt-0.5"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
+              {colLeads.map((lead) => {
+                const niche = parseNiche(lead.notes);
+                const ig = parseIG(lead.notes);
+                const useCase = parseUseCase(lead.notes);
+                return (
+                  <div
+                    key={lead.id}
+                    draggable
+                    onDragStart={(e) => { draggingId.current = lead.id; e.dataTransfer.effectAllowed = "move"; }}
+                    onDragEnd={() => { draggingId.current = null; setOverColumn(null); }}
+                    onClick={() => onEdit(lead)}
+                    className="bg-white rounded-lg border border-gray-200 p-3 cursor-grab active:cursor-grabbing hover:border-orange-200 hover:shadow-sm transition-all select-none"
+                  >
+                    {/* Name + link */}
+                    <div className="flex items-start justify-between gap-1 mb-1.5">
+                      <p className="text-sm font-semibold text-gray-900 leading-tight">{lead.shop_name}</p>
+                      {lead.store_url && (
+                        <a
+                          href={lead.store_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-gray-300 hover:text-orange-500 flex-shrink-0 mt-0.5"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Niche */}
+                    {niche && (
+                      <p className="text-[10px] text-indigo-600 bg-indigo-50 rounded px-1.5 py-0.5 inline-block mb-1.5 font-medium leading-tight">
+                        {niche}
+                      </p>
+                    )}
+
+                    {/* Meta chips */}
+                    <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                      <span className="text-[10px] text-gray-400 capitalize font-medium">{lead.marketplace}</span>
+                      {ig && (
+                        <span className="text-[10px] text-pink-600 bg-pink-50 px-1.5 py-0.5 rounded font-semibold">
+                          {ig} IG
+                        </span>
+                      )}
+                      {lead.source && <SourceBadge source={lead.source} />}
+                    </div>
+
+                    {/* Contact */}
+                    {lead.contact_email && (
+                      <div className="flex items-center justify-between gap-1 mb-0.5" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 text-[11px] text-blue-500 min-w-0">
+                          <Mail className="w-2.5 h-2.5 flex-shrink-0" />
+                          <span className="truncate">{lead.contact_email}</span>
+                        </div>
+                        <CopyBtn text={lead.contact_email} />
+                      </div>
+                    )}
+                    {lead.contact_phone && (
+                      <div className="flex items-center justify-between gap-1" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                          <Phone className="w-2.5 h-2.5 flex-shrink-0" />
+                          <span>{lead.contact_phone}</span>
+                        </div>
+                        <CopyBtn text={lead.contact_phone} />
+                      </div>
+                    )}
+
+                    {/* Use-case snippet */}
+                    {useCase && (
+                      <p className="text-[10px] text-gray-400 mt-1.5 line-clamp-2 leading-relaxed">{useCase}</p>
                     )}
                   </div>
-                  <p className="text-[11px] text-gray-400 capitalize mb-1.5">{lead.marketplace}</p>
-                  {lead.contact_email && (
-                    <div className="flex items-center gap-1 text-[11px] text-blue-500 truncate">
-                      <Mail className="w-2.5 h-2.5 flex-shrink-0" />
-                      <span className="truncate">{lead.contact_email}</span>
-                    </div>
-                  )}
-                  {lead.contact_phone && (
-                    <div className="flex items-center gap-1 text-[11px] text-gray-400 mt-0.5">
-                      <Phone className="w-2.5 h-2.5 flex-shrink-0" />
-                      <span>{lead.contact_phone}</span>
-                    </div>
-                  )}
-                  {lead.notes && (
-                    <p className="text-[11px] text-gray-400 mt-1.5 line-clamp-2 italic">{lead.notes}</p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
 
               {colLeads.length === 0 && (
                 <div className={`rounded-lg border-2 border-dashed h-14 flex items-center justify-center transition-colors ${isOver ? "border-orange-300 bg-orange-50/50" : "border-gray-200"}`}>
@@ -148,6 +233,7 @@ export default function LeadsPage() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"list" | "kanban">("kanban");
   const [filterStatus, setFilterStatus] = useState("hepsi");
+  const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -205,25 +291,40 @@ export default function LeadsPage() {
     setLeads((prev) => prev.filter((l) => l.id !== id));
   }
 
-  const filtered = filterStatus === "hepsi" ? leads : leads.filter((l) => l.status === filterStatus);
+  const q = search.trim().toLowerCase();
+  const searched = q
+    ? leads.filter((l) =>
+        l.shop_name.toLowerCase().includes(q) ||
+        (l.notes && l.notes.toLowerCase().includes(q)) ||
+        (l.contact_email && l.contact_email.toLowerCase().includes(q))
+      )
+    : leads;
+  const filtered = filterStatus === "hepsi" ? searched : searched.filter((l) => l.status === filterStatus);
 
-  const stats = {
-    total: leads.length,
-    active: leads.filter((l) => !["musteri", "kayip"].includes(l.status)).length,
-    musteri: leads.filter((l) => l.status === "musteri").length,
-    kayip: leads.filter((l) => l.status === "kayip").length,
-  };
+  const total = leads.length;
+  const active = leads.filter((l) => !["musteri", "kayip"].includes(l.status)).length;
+  const musteri = leads.filter((l) => l.status === "musteri").length;
+  const kayip = leads.filter((l) => l.status === "kayip").length;
+  const convRate = total > 0 ? Math.round((musteri / total) * 100) : 0;
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">BD & Leads</h2>
           <p className="text-gray-500 mt-1">Potansiyel müşteri takibi</p>
         </div>
-        <div className="flex items-center gap-2">
-          {/* View toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Mağaza, niche, email ara..."
+              className="pl-8 pr-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 w-52"
+            />
+          </div>
           <div className="flex gap-0.5 bg-gray-100 p-0.5 rounded-lg">
             <button
               onClick={() => setView("kanban")}
@@ -248,12 +349,13 @@ export default function LeadsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[
-          { label: "Toplam Lead",      value: stats.total,   color: "text-gray-900" },
-          { label: "Aktif Pipeline",   value: stats.active,  color: "text-orange-600" },
-          { label: "Müşteriye Döndü", value: stats.musteri, color: "text-green-600" },
-          { label: "Kayıp",            value: stats.kayip,   color: "text-red-500" },
+          { label: "Toplam Lead",      value: total,        color: "text-gray-900" },
+          { label: "Aktif Pipeline",   value: active,       color: "text-orange-600" },
+          { label: "Müşteriye Döndü", value: musteri,      color: "text-green-600" },
+          { label: "Kayıp",            value: kayip,        color: "text-red-500" },
+          { label: "Dönüşüm Oranı",   value: `${convRate}%`, color: "text-indigo-600" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4">
             <p className={`text-2xl font-bold ${s.color}`}>{loading ? "—" : s.value}</p>
@@ -268,14 +370,13 @@ export default function LeadsPage() {
           Yükleniyor...
         </div>
       ) : view === "kanban" ? (
-        /* ── Kanban ── */
-        <KanbanBoard leads={leads} onEdit={openEdit} onStatusChange={updateStatus} />
+        <KanbanBoard leads={searched} onEdit={openEdit} onStatusChange={updateStatus} />
       ) : (
-        /* ── Liste ── */
         <>
+          {/* Status filter chips */}
           <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
             {STATUSES.map((s) => {
-              const count = leads.filter((l) => l.status === s.key).length;
+              const count = searched.filter((l) => l.status === s.key).length;
               return (
                 <button
                   key={s.key}
@@ -299,73 +400,111 @@ export default function LeadsPage() {
               <div className="p-8 text-center text-gray-400 text-sm">Lead bulunamadı.</div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {filtered.map((lead) => (
-                  <div key={lead.id}>
-                    <div
-                      className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => setExpandedId(expandedId === lead.id ? null : lead.id)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold text-gray-900">{lead.shop_name}</span>
-                          <span className="text-xs text-gray-400 capitalize">{lead.marketplace}</span>
-                          {lead.store_url && (
-                            <a href={lead.store_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-orange-500 hover:text-orange-600">
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
+                {filtered.map((lead) => {
+                  const niche = parseNiche(lead.notes);
+                  const ig = parseIG(lead.notes);
+                  return (
+                    <div key={lead.id}>
+                      <div
+                        className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => setExpandedId(expandedId === lead.id ? null : lead.id)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-gray-900">{lead.shop_name}</span>
+                            <span className="text-xs text-gray-400 capitalize">{lead.marketplace}</span>
+                            {lead.store_url && (
+                              <a href={lead.store_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-orange-500 hover:text-orange-600">
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                            {niche && (
+                              <span className="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded font-medium">{niche}</span>
+                            )}
+                            {ig && (
+                              <span className="text-[10px] text-pink-600 bg-pink-50 px-2 py-0.5 rounded font-semibold">{ig} IG</span>
+                            )}
+                          </div>
+                          {lead.contact_email && <p className="text-xs text-gray-400 mt-0.5">{lead.contact_email}</p>}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          {lead.source && <SourceBadge source={lead.source} />}
+                          <StatusBadge status={lead.status} />
+                          <div className="relative group">
+                            <button className="p-1 text-gray-300 hover:text-gray-500 transition-colors">
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="absolute right-0 top-6 z-10 bg-white rounded-xl border border-gray-200 shadow-lg p-1 w-36 hidden group-hover:block">
+                              {STATUSES.map((s) => (
+                                <button
+                                  key={s.key}
+                                  onClick={() => updateStatus(lead.id, s.key)}
+                                  className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 hover:bg-gray-50 ${lead.status === s.key ? "text-orange-600" : "text-gray-700"}`}
+                                >
+                                  {lead.status === s.key ? <Check className="w-3 h-3" /> : <span className="w-3" />}
+                                  {s.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <span className="text-xs text-gray-400 flex-shrink-0">
+                          {new Date(lead.created_at).toLocaleDateString("tr-TR")}
+                        </span>
+                      </div>
+
+                      {expandedId === lead.id && (
+                        <div className="px-5 pb-4 bg-gray-50 border-t border-gray-100 space-y-3">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-3">
+                            {lead.contact_name && (
+                              <div>
+                                <p className="text-xs text-gray-400">İletişim</p>
+                                <p className="text-sm text-gray-700">{lead.contact_name}</p>
+                              </div>
+                            )}
+                            {lead.contact_phone && (
+                              <div>
+                                <p className="text-xs text-gray-400">Telefon</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-sm text-gray-700">{lead.contact_phone}</p>
+                                  <CopyBtn text={lead.contact_phone} />
+                                </div>
+                              </div>
+                            )}
+                            {lead.contact_email && (
+                              <div>
+                                <p className="text-xs text-gray-400">Email</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-sm text-gray-700 truncate">{lead.contact_email}</p>
+                                  <CopyBtn text={lead.contact_email} />
+                                </div>
+                              </div>
+                            )}
+                            {lead.source && (
+                              <div>
+                                <p className="text-xs text-gray-400">Kaynak</p>
+                                <p className="text-sm text-gray-700 capitalize">{lead.source}</p>
+                              </div>
+                            )}
+                          </div>
+                          {lead.notes && (
+                            <div>
+                              <p className="text-xs text-gray-400 mb-1">Notlar</p>
+                              <p className="text-sm text-gray-700 bg-white rounded-lg border border-gray-200 px-3 py-2 whitespace-pre-wrap">{lead.notes}</p>
+                            </div>
                           )}
-                        </div>
-                        {lead.contact_email && <p className="text-xs text-gray-400 mt-0.5">{lead.contact_email}</p>}
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <StatusBadge status={lead.status} />
-                        <div className="relative group">
-                          <button className="p-1 text-gray-300 hover:text-gray-500 transition-colors">
-                            <ChevronDown className="w-3.5 h-3.5" />
-                          </button>
-                          <div className="absolute right-0 top-6 z-10 bg-white rounded-xl border border-gray-200 shadow-lg p-1 w-36 hidden group-hover:block">
-                            {STATUSES.map((s) => (
-                              <button
-                                key={s.key}
-                                onClick={() => updateStatus(lead.id, s.key)}
-                                className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-2 hover:bg-gray-50 ${lead.status === s.key ? "text-orange-600" : "text-gray-700"}`}
-                              >
-                                {lead.status === s.key ? <Check className="w-3 h-3" /> : <span className="w-3" />}
-                                {s.label}
-                              </button>
-                            ))}
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={() => openEdit(lead)} className="text-xs text-orange-600 font-semibold hover:underline">Düzenle</button>
+                            <span className="text-gray-300">·</span>
+                            <button onClick={() => deleteLead(lead.id)} className="text-xs text-red-500 hover:underline">Sil</button>
                           </div>
                         </div>
-                      </div>
-
-                      <span className="text-xs text-gray-400 flex-shrink-0">
-                        {new Date(lead.created_at).toLocaleDateString("tr-TR")}
-                      </span>
+                      )}
                     </div>
-
-                    {expandedId === lead.id && (
-                      <div className="px-5 pb-4 bg-gray-50 border-t border-gray-100 space-y-3">
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 pt-3">
-                          {lead.contact_name && <div><p className="text-xs text-gray-400">İletişim</p><p className="text-sm text-gray-700">{lead.contact_name}</p></div>}
-                          {lead.contact_phone && <div><p className="text-xs text-gray-400">Telefon</p><p className="text-sm text-gray-700">{lead.contact_phone}</p></div>}
-                          {lead.source && <div><p className="text-xs text-gray-400">Kaynak</p><p className="text-sm text-gray-700">{lead.source}</p></div>}
-                        </div>
-                        {lead.notes && (
-                          <div>
-                            <p className="text-xs text-gray-400 mb-1">Notlar</p>
-                            <p className="text-sm text-gray-700 bg-white rounded-lg border border-gray-200 px-3 py-2 whitespace-pre-wrap">{lead.notes}</p>
-                          </div>
-                        )}
-                        <div className="flex gap-2 pt-1">
-                          <button onClick={() => openEdit(lead)} className="text-xs text-orange-600 font-semibold hover:underline">Düzenle</button>
-                          <span className="text-gray-300">·</span>
-                          <button onClick={() => deleteLead(lead.id)} className="text-xs text-red-500 hover:underline">Sil</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -419,7 +558,7 @@ export default function LeadsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Kaynak</label>
-                  <input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="LinkedIn, Trendyol arama, referans..."
+                  <input value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })} placeholder="instagram, website, referans..."
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50" />
                 </div>
                 <div className="col-span-2">
@@ -429,8 +568,8 @@ export default function LeadsPage() {
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Notlar</label>
-                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3}
-                    placeholder="Görüşme notları, ilgi alanları, takip tarihi..."
+                  <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={4}
+                    placeholder="Niche: ... · 50K IG · Görüşme notları, use-case, takip tarihi..."
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50 resize-none" />
                 </div>
               </div>

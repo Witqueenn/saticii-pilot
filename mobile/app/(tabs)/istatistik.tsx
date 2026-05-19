@@ -12,8 +12,8 @@ import { supabase } from "@/lib/supabase";
 import { Skeleton } from "@/lib/Skeleton";
 import { useTheme } from "@/lib/theme";
 
-interface Review { rating: number; created_at: string; status: string; }
-interface Return { status: string; created_at: string; }
+interface Review { rating: number; created_at: string; is_replied: boolean; }
+interface Return { created_at: string; reason: string; }
 
 // Basit pie chart — 5 dilim (1-5 yıldız)
 function PieChart({ data, centerFill, textColor }: { data: { value: number; color: string }[]; centerFill: string; textColor: string }) {
@@ -82,8 +82,8 @@ export default function IstatistikScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const [rRes, retRes] = await Promise.all([
-      supabase.from("reviews").select("rating, created_at, status").eq("seller_id", user.id),
-      supabase.from("returns").select("status, created_at").eq("seller_id", user.id),
+      supabase.from("reviews").select("rating, created_at, is_replied").eq("seller_id", user.id),
+      supabase.from("returns").select("created_at, reason").eq("seller_id", user.id),
     ]);
     setReviews(rRes.data ?? []);
     setReturns(retRes.data ?? []);
@@ -133,14 +133,16 @@ export default function IstatistikScreen() {
   }
 
   // Yanıt oranı
-  const replied = reviews.filter((r) => r.status === "cevaplandi").length;
+  const replied = reviews.filter((r) => r.is_replied).length;
   const replyRate = reviews.length ? Math.round((replied / reviews.length) * 100) : 0;
 
-  // İade oranı (son 30 gün)
+  // İade özeti (son 30 gün)
   const since30 = new Date(); since30.setDate(since30.getDate() - 30);
   const recentReturns = returns.filter((r) => new Date(r.created_at) >= since30).length;
-  const approvedReturns = returns.filter((r) => r.status === "onaylandi").length;
-  const returnApprovalRate = returns.length ? Math.round((approvedReturns / returns.length) * 100) : 0;
+  const topReasonEntry = Object.entries(
+    returns.reduce((acc: Record<string, number>, r) => { acc[r.reason] = (acc[r.reason] ?? 0) + 1; return acc; }, {})
+  ).sort((a, b) => b[1] - a[1])[0];
+  const topReasonPct = topReasonEntry && returns.length ? Math.round((topReasonEntry[1] / returns.length) * 100) : 0;
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]} edges={["top"]}>
@@ -216,7 +218,7 @@ export default function IstatistikScreen() {
           <View style={styles.returnGrid}>
             <ReturnStat label="Toplam" value={returns.length} valueColor={t.text} labelColor={t.textMuted} bgColor={t.bg} />
             <ReturnStat label="Son 30 gün" value={recentReturns} valueColor={t.orange} labelColor={t.textMuted} bgColor={t.bg} />
-            <ReturnStat label="Onay oranı" value={`%${returnApprovalRate}`} valueColor="#059669" labelColor={t.textMuted} bgColor={t.bg} />
+            <ReturnStat label="En sık neden" value={`%${topReasonPct}`} valueColor="#dc2626" labelColor={t.textMuted} bgColor={t.bg} />
           </View>
         </View>
       </ScrollView>

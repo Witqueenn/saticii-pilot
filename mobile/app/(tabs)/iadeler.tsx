@@ -8,36 +8,50 @@ import {
   ActivityIndicator,
   RefreshControl,
   Modal,
-  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { supabase } from "@/lib/supabase";
 import { SkeletonCard } from "@/lib/Skeleton";
-import { useBadges } from "@/lib/BadgeContext";
 import { useTheme } from "@/lib/theme";
 
 interface Return {
   id: string;
+  marketplace: string;
+  product_id: string;
   product_name: string;
   reason: string;
-  status: string;
+  customer_comment?: string;
+  returned_at: string;
   created_at: string;
 }
 
-const STATUS_OPTS = [
-  { label: "Tümü", value: "all" },
-  { label: "Bekliyor", value: "beklemede" },
-  { label: "Onaylandı", value: "onaylandi" },
-  { label: "Reddedildi", value: "reddedildi" },
-];
-
-const STATUS_STYLE: Record<string, { label: string; color: string; bg: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = {
-  beklemede: { label: "Bekliyor", color: "#d97706", bg: "#fef3c7", icon: "time-outline" },
-  onaylandi: { label: "Onaylandı", color: "#059669", bg: "#d1fae5", icon: "checkmark-circle-outline" },
-  reddedildi: { label: "Reddedildi", color: "#dc2626", bg: "#fee2e2", icon: "close-circle-outline" },
+const REASON_LABEL: Record<string, string> = {
+  beden_uyumsuzlugu: "Beden Uyumsuzluğu",
+  renk_farki: "Renk Farkı",
+  kalite_sorunu: "Kalite Sorunu",
+  yanlis_urun: "Yanlış Ürün",
+  hasarli: "Hasarlı",
+  diger: "Diğer",
 };
+
+const REASON_COLOR: Record<string, { color: string; bg: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = {
+  beden_uyumsuzlugu: { color: "#7c3aed", bg: "#ede9fe", icon: "resize-outline" },
+  renk_farki:        { color: "#0891b2", bg: "#cffafe", icon: "color-palette-outline" },
+  kalite_sorunu:     { color: "#dc2626", bg: "#fee2e2", icon: "warning-outline" },
+  yanlis_urun:       { color: "#d97706", bg: "#fef3c7", icon: "swap-horizontal-outline" },
+  hasarli:           { color: "#be123c", bg: "#ffe4e6", icon: "bandage-outline" },
+  diger:             { color: "#6b7280", bg: "#f3f4f6", icon: "help-circle-outline" },
+};
+
+const FILTER_OPTS = [
+  { label: "Tümü", value: "all" },
+  { label: "Beden", value: "beden_uyumsuzlugu" },
+  { label: "Renk", value: "renk_farki" },
+  { label: "Kalite", value: "kalite_sorunu" },
+  { label: "Diğer", value: "diger" },
+];
 
 export default function IadelerScreen() {
   const t = useTheme();
@@ -46,25 +60,22 @@ export default function IadelerScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Return | null>(null);
-  const [updating, setUpdating] = useState(false);
-  const { refresh: refreshBadges } = useBadges();
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase
       .from("returns")
-      .select("id, product_name, reason, status, created_at")
+      .select("id, marketplace, product_id, product_name, reason, customer_comment, returned_at, created_at")
       .eq("seller_id", user.id)
-      .order("created_at", { ascending: false });
+      .order("returned_at", { ascending: false });
     setReturns(data ?? []);
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
 
-  const filtered = filter === "all" ? returns : returns.filter((r) => r.status === filter);
-  const pending = returns.filter((r) => r.status === "beklemede").length;
+  const filtered = filter === "all" ? returns : returns.filter((r) => r.reason === filter);
 
   async function onRefresh() {
     setRefreshing(true);
@@ -75,24 +86,6 @@ export default function IadelerScreen() {
   function openReturn(r: Return) {
     Haptics.selectionAsync();
     setSelected(r);
-  }
-
-  async function updateStatus(newStatus: "onaylandi" | "reddedildi") {
-    if (!selected) return;
-    Haptics.notificationAsync(
-      newStatus === "onaylandi"
-        ? Haptics.NotificationFeedbackType.Success
-        : Haptics.NotificationFeedbackType.Warning
-    );
-    setUpdating(true);
-    await supabase.from("returns").update({ status: newStatus }).eq("id", selected.id);
-    setReturns((prev) =>
-      prev.map((r) => r.id === selected.id ? { ...r, status: newStatus } : r)
-    );
-    setSelected(null);
-    setUpdating(false);
-    refreshBadges();
-    Alert.alert(newStatus === "onaylandi" ? "İade onaylandı ✓" : "İade reddedildi");
   }
 
   if (loading) {
@@ -113,25 +106,31 @@ export default function IadelerScreen() {
       <View style={[styles.header, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
         <View>
           <Text style={[styles.title, { color: t.text }]}>İadeler</Text>
-          {pending > 0 && <Text style={styles.pendingText}>{pending} bekleyen</Text>}
+          <Text style={[styles.subtitle, { color: t.textSub }]}>{returns.length} toplam iade</Text>
         </View>
         <View style={[styles.countBadge, { backgroundColor: t.input }]}>
           <Text style={[styles.countText, { color: t.textSub }]}>{filtered.length}</Text>
         </View>
       </View>
 
-      <View style={[styles.filters, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
-        {STATUS_OPTS.map((f) => (
-          <TouchableOpacity
-            key={f.value}
-            style={[styles.filterBtn, { backgroundColor: t.input }, filter === f.value && { backgroundColor: t.orange }]}
-            onPress={() => { Haptics.selectionAsync(); setFilter(f.value); }}
-          >
-            <Text style={[styles.filterText, { color: t.textSub }, filter === f.value && styles.filterTextActive]}>
-              {f.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={[styles.filtersWrap, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={FILTER_OPTS}
+          keyExtractor={(f) => f.value}
+          contentContainerStyle={styles.filtersList}
+          renderItem={({ item: f }) => (
+            <TouchableOpacity
+              style={[styles.filterBtn, { backgroundColor: t.input }, filter === f.value && { backgroundColor: t.orange }]}
+              onPress={() => { Haptics.selectionAsync(); setFilter(f.value); }}
+            >
+              <Text style={[styles.filterText, { color: t.textSub }, filter === f.value && styles.filterTextActive]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
       </View>
 
       <FlatList
@@ -140,33 +139,29 @@ export default function IadelerScreen() {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.orange} />}
         renderItem={({ item: r }) => {
-          const s = STATUS_STYLE[r.status];
+          const rc = REASON_COLOR[r.reason] ?? REASON_COLOR.diger;
+          const label = REASON_LABEL[r.reason] ?? r.reason;
           return (
             <TouchableOpacity
-              style={[styles.card, { backgroundColor: t.card, borderColor: t.borderStrong, borderLeftColor: s?.color ?? t.borderStrong, borderLeftWidth: 3 }]}
+              style={[styles.card, { backgroundColor: t.card, borderColor: t.borderStrong, borderLeftColor: rc.color, borderLeftWidth: 3 }]}
               onPress={() => openReturn(r)}
               activeOpacity={0.75}
             >
               <View style={styles.cardTop}>
                 <Text style={[styles.product, { color: t.text }]} numberOfLines={1}>{r.product_name}</Text>
-                {s && (
-                  <View style={[styles.badge, { backgroundColor: s.bg }]}>
-                    <Ionicons name={s.icon} size={11} color={s.color} />
-                    <Text style={[styles.badgeText, { color: s.color }]}>{s.label}</Text>
-                  </View>
-                )}
+                <View style={[styles.badge, { backgroundColor: rc.bg }]}>
+                  <Ionicons name={rc.icon} size={11} color={rc.color} />
+                  <Text style={[styles.badgeText, { color: rc.color }]}>{label}</Text>
+                </View>
               </View>
-              <Text style={[styles.reason, { color: t.textSub }]} numberOfLines={2}>{r.reason}</Text>
+              {r.customer_comment ? (
+                <Text style={[styles.comment, { color: t.textSub }]} numberOfLines={2}>{r.customer_comment}</Text>
+              ) : null}
               <View style={styles.cardBottom}>
+                <Text style={[styles.marketplace, { color: t.orange }]}>{r.marketplace}</Text>
                 <Text style={[styles.date, { color: t.textMuted }]}>
-                  {new Date(r.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
+                  {new Date(r.returned_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
                 </Text>
-                {r.status === "beklemede" && (
-                  <View style={styles.tapHint}>
-                    <Text style={[styles.tapHintText, { color: t.textMuted }]}>İşlem yap</Text>
-                    <Ionicons name="chevron-forward" size={12} color={t.textMuted} />
-                  </View>
-                )}
               </View>
             </TouchableOpacity>
           );
@@ -186,62 +181,45 @@ export default function IadelerScreen() {
             <TouchableOpacity onPress={() => setSelected(null)} style={[styles.modalClose, { backgroundColor: t.input }]}>
               <Ionicons name="close" size={22} color={t.textSub} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: t.text }]}>İade Talebi</Text>
+            <Text style={[styles.modalTitle, { color: t.text }]}>İade Detayı</Text>
             <View style={{ width: 36 }} />
           </View>
 
-          {selected && (
-            <View style={styles.modalBody}>
-              {/* Status badge */}
-              {STATUS_STYLE[selected.status] && (
-                <View style={[styles.modalStatusBadge, { backgroundColor: STATUS_STYLE[selected.status].bg }]}>
-                  <Ionicons name={STATUS_STYLE[selected.status].icon} size={16} color={STATUS_STYLE[selected.status].color} />
-                  <Text style={[styles.modalStatusText, { color: STATUS_STYLE[selected.status].color }]}>
-                    {STATUS_STYLE[selected.status].label}
-                  </Text>
+          {selected && (() => {
+            const rc = REASON_COLOR[selected.reason] ?? REASON_COLOR.diger;
+            const label = REASON_LABEL[selected.reason] ?? selected.reason;
+            return (
+              <View style={styles.modalBody}>
+                <View style={[styles.modalReasonBadge, { backgroundColor: rc.bg }]}>
+                  <Ionicons name={rc.icon} size={16} color={rc.color} />
+                  <Text style={[styles.modalReasonBadgeText, { color: rc.color }]}>{label}</Text>
                 </View>
-              )}
 
-              <Text style={[styles.modalProduct, { color: t.text }]}>{selected.product_name}</Text>
-              <Text style={[styles.modalDate, { color: t.textMuted }]}>
-                {new Date(selected.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
-              </Text>
+                <Text style={[styles.modalProduct, { color: t.text }]}>{selected.product_name}</Text>
+                <Text style={[styles.modalMeta, { color: t.textMuted }]}>
+                  {selected.marketplace.toUpperCase()} · {new Date(selected.returned_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+                </Text>
 
-              <Text style={[styles.modalReasonLabel, { color: t.textSub }]}>İade Nedeni</Text>
-              <View style={[styles.modalReasonBox, { backgroundColor: t.bg }]}>
-                <Text style={[styles.modalReason, { color: t.textSub }]}>{selected.reason}</Text>
+                {selected.customer_comment ? (
+                  <>
+                    <Text style={[styles.modalLabel, { color: t.textSub }]}>Müşteri Yorumu</Text>
+                    <View style={[styles.modalCommentBox, { backgroundColor: t.bg }]}>
+                      <Text style={[styles.modalComment, { color: t.textSub }]}>{selected.customer_comment}</Text>
+                    </View>
+                  </>
+                ) : (
+                  <View style={[styles.modalCommentBox, { backgroundColor: t.bg }]}>
+                    <Text style={[styles.modalComment, { color: t.textMuted }]}>Müşteri yorumu eklenmemiş.</Text>
+                  </View>
+                )}
+
+                <View style={[styles.infoRow, { borderColor: t.border }]}>
+                  <Text style={[styles.infoLabel, { color: t.textMuted }]}>Ürün ID</Text>
+                  <Text style={[styles.infoValue, { color: t.textSub }]}>{selected.product_id}</Text>
+                </View>
               </View>
-
-              {selected.status === "beklemede" && (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.rejectBtn, { borderColor: "#fecaca" }]}
-                    onPress={() => updateStatus("reddedildi")}
-                    disabled={updating}
-                  >
-                    {updating ? <ActivityIndicator color="#dc2626" size="small" /> : (
-                      <>
-                        <Ionicons name="close-circle" size={18} color="#dc2626" />
-                        <Text style={styles.rejectText}>Reddet</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.approveBtn]}
-                    onPress={() => updateStatus("onaylandi")}
-                    disabled={updating}
-                  >
-                    {updating ? <ActivityIndicator color="#fff" size="small" /> : (
-                      <>
-                        <Ionicons name="checkmark-circle" size={18} color="#fff" />
-                        <Text style={styles.approveText}>Onayla</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
+            );
+          })()}
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -252,24 +230,24 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomWidth: 1 },
   title: { fontSize: 22, fontWeight: "800" },
-  pendingText: { fontSize: 12, color: "#d97706", fontWeight: "600", marginTop: 2 },
+  subtitle: { fontSize: 12, marginTop: 2 },
   countBadge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
   countText: { fontSize: 13, fontWeight: "600" },
-  filters: { flexDirection: "row", gap: 8, padding: 16, borderBottomWidth: 1 },
+  filtersWrap: { borderBottomWidth: 1 },
+  filtersList: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
   filterBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
   filterText: { fontSize: 13, fontWeight: "500" },
   filterTextActive: { color: "#fff", fontWeight: "700" },
   list: { padding: 16, gap: 12, paddingBottom: 32 },
   card: { borderRadius: 14, padding: 16, borderWidth: 1 },
-  cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   product: { flex: 1, fontSize: 14, fontWeight: "700", marginRight: 8 },
   badge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { fontSize: 11, fontWeight: "700" },
-  reason: { fontSize: 13, marginBottom: 8, lineHeight: 18 },
-  cardBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  comment: { fontSize: 13, marginBottom: 8, lineHeight: 18 },
+  cardBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 4 },
+  marketplace: { fontSize: 11, fontWeight: "700", textTransform: "uppercase" },
   date: { fontSize: 11 },
-  tapHint: { flexDirection: "row", alignItems: "center", gap: 2 },
-  tapHintText: { fontSize: 12 },
   empty: { alignItems: "center", paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 15 },
   // Modal
@@ -278,17 +256,14 @@ const styles = StyleSheet.create({
   modalClose: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   modalTitle: { fontSize: 16, fontWeight: "700" },
   modalBody: { padding: 20 },
-  modalStatusBadge: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 16 },
-  modalStatusText: { fontSize: 13, fontWeight: "700" },
+  modalReasonBadge: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginBottom: 16 },
+  modalReasonBadgeText: { fontSize: 13, fontWeight: "700" },
   modalProduct: { fontSize: 20, fontWeight: "800", marginBottom: 4 },
-  modalDate: { fontSize: 13, marginBottom: 20 },
-  modalReasonLabel: { fontSize: 13, fontWeight: "700", marginBottom: 8 },
-  modalReasonBox: { borderRadius: 14, padding: 16, marginBottom: 28 },
-  modalReason: { fontSize: 15, lineHeight: 22 },
-  actionRow: { flexDirection: "row", gap: 12 },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 16, borderRadius: 14 },
-  rejectBtn: { backgroundColor: "transparent", borderWidth: 1.5 },
-  rejectText: { color: "#dc2626", fontSize: 15, fontWeight: "700" },
-  approveBtn: { backgroundColor: "#059669" },
-  approveText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  modalMeta: { fontSize: 13, marginBottom: 20 },
+  modalLabel: { fontSize: 13, fontWeight: "700", marginBottom: 8 },
+  modalCommentBox: { borderRadius: 14, padding: 16, marginBottom: 20 },
+  modalComment: { fontSize: 15, lineHeight: 22 },
+  infoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1 },
+  infoLabel: { fontSize: 13 },
+  infoValue: { fontSize: 13, fontWeight: "600" },
 });

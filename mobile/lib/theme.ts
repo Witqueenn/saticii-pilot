@@ -1,4 +1,5 @@
-import { useColorScheme } from "react-native";
+import { useContext } from "react";
+import { ThemeContext } from "./ThemeContext";
 
 export const light = {
   bg: "#f9fafb",
@@ -33,6 +34,6 @@ export const dark = {
 export type Theme = typeof light;
 
 export function useTheme(): Theme {
-  const scheme = useColorScheme();
-  return scheme === "dark" ? dark : light;
+  const ctx = useContext(ThemeContext);
+  return ctx.theme;
 }

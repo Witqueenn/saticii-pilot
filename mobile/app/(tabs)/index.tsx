@@ -3,6 +3,7 @@ import {
   View,
   Text,
   ScrollView,
+  FlatList,
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
@@ -33,11 +34,20 @@ interface Review {
   rating: number;
   comment: string;
   product_name: string;
-  status: string;
+  is_replied: boolean;
+  is_urgent: boolean;
   created_at: string;
 }
 
 interface DayCount { day: string; count: number }
+
+const QUICK_ITEMS = [
+  { label: "Analiz",     href: "/(tabs)/istatistik", icon: "bar-chart-outline",    color: "#16a34a", bg: "#f0fdf4" },
+  { label: "Rakip",      href: "/rakip",              icon: "trending-up-outline",  color: "#d97706", bg: "#fef3c7" },
+  { label: "Müşteriler", href: "/musteri",             icon: "people-outline",       color: "#6366f1", bg: "#f5f3ff" },
+  { label: "Kampanya",   href: "/kampanya",            icon: "megaphone-outline",    color: "#ec4899", bg: "#fdf2f8" },
+  { label: "Mesajlar",   href: "/(tabs)/mesajlar",    icon: "mail-outline",         color: "#3b82f6", bg: "#eff6ff" },
+];
 
 function Sparkline({ data, color, lineColor }: { data: DayCount[]; color: string; lineColor: string }) {
   const W = 280, H = 56;
@@ -86,8 +96,8 @@ export default function DashboardScreen() {
     setSellerId(user.id);
 
     const [reviewsRes, returnsRes, productsRes] = await Promise.all([
-      supabase.from("reviews").select("id, rating, status, created_at").eq("seller_id", user.id),
-      supabase.from("returns").select("id, status").eq("seller_id", user.id),
+      supabase.from("reviews").select("id, rating, is_replied, is_urgent, created_at").eq("seller_id", user.id),
+      supabase.from("returns").select("id").eq("seller_id", user.id),
       supabase.from("products").select("id").eq("seller_id", user.id),
     ]);
 
@@ -98,15 +108,15 @@ export default function DashboardScreen() {
     const avgRating = reviews.length
       ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
       : "—";
-    const pendingCount = returns.filter((r: any) => r.status === "beklemede").length;
+    const returnsCount = returns.length;
     const unrepliedCount = reviews.filter((r: any) => !r.is_replied).length;
-    setPendingReturns(pendingCount);
+    setPendingReturns(returnsCount);
     setUnreplied(unrepliedCount);
 
     setKpis([
       { label: "Toplam Yorum", value: reviews.length, color: "#3b82f6", bg: "#eff6ff", icon: "chatbubble", href: "/(tabs)/yorumlar" },
       { label: "Ort. Puan", value: avgRating, color: "#f97316", bg: "#fff7ed", icon: "star", href: "/(tabs)/yorumlar" },
-      { label: "Bekleyen İade", value: pendingCount, color: "#ef4444", bg: "#fef2f2", icon: "cube", href: "/(tabs)/iadeler" },
+      { label: "Toplam İade", value: returnsCount, color: "#ef4444", bg: "#fef2f2", icon: "cube", href: "/(tabs)/iadeler" },
       { label: "Cevaplanmadı", value: unrepliedCount, color: "#8b5cf6", bg: "#f5f3ff", icon: "time", href: "/(tabs)/yorumlar" },
     ]);
 
@@ -240,36 +250,26 @@ export default function DashboardScreen() {
         )}
 
         {/* Hızlı erişim */}
-        <View style={styles.quickGrid}>
-          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/(tabs)/mesajlar")}>
-            <View style={[styles.quickIcon, { backgroundColor: "#eff6ff" }]}>
-              <Ionicons name="mail-outline" size={18} color="#3b82f6" />
-            </View>
-            <Text style={[styles.quickLabel, { color: t.text }]}>Mesajlar</Text>
-            <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/(tabs)/istatistik")}>
-            <View style={[styles.quickIcon, { backgroundColor: "#f0fdf4" }]}>
-              <Ionicons name="bar-chart-outline" size={18} color="#16a34a" />
-            </View>
-            <Text style={[styles.quickLabel, { color: t.text }]}>Analiz</Text>
-            <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/rakip")}>
-            <View style={[styles.quickIcon, { backgroundColor: "#fef3c7" }]}>
-              <Ionicons name="trending-up-outline" size={18} color="#d97706" />
-            </View>
-            <Text style={[styles.quickLabel, { color: t.text }]}>Rakip</Text>
-            <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]} onPress={() => router.push("/musteri")}>
-            <View style={[styles.quickIcon, { backgroundColor: "#f5f3ff" }]}>
-              <Ionicons name="people-outline" size={18} color="#6366f1" />
-            </View>
-            <Text style={[styles.quickLabel, { color: t.text }]}>Müşteriler</Text>
-            <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
-          </TouchableOpacity>
-        </View>
+        <FlatList
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={QUICK_ITEMS}
+          keyExtractor={(item) => item.label}
+          contentContainerStyle={styles.quickList}
+          style={styles.quickScroll}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.quickCard, { backgroundColor: t.card, borderColor: t.borderStrong }]}
+              onPress={() => { Haptics.selectionAsync(); router.push(item.href as any); }}
+            >
+              <View style={[styles.quickIcon, { backgroundColor: item.bg }]}>
+                <Ionicons name={item.icon as any} size={18} color={item.color} />
+              </View>
+              <Text style={[styles.quickLabel, { color: t.text }]}>{item.label}</Text>
+              <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
+            </TouchableOpacity>
+          )}
+        />
 
         {/* Sparkline chart */}
         {totalReviews > 0 && (
@@ -345,8 +345,9 @@ const styles = StyleSheet.create({
   actionDot: { width: 7, height: 7, borderRadius: 4 },
   actionText: { flex: 1, fontSize: 13 },
   actionDivider: { height: 1, marginHorizontal: 16 },
-  quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 },
-  quickCard: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 14, borderWidth: 1 },
+  quickScroll: { marginHorizontal: -16, marginBottom: 12 },
+  quickList: { paddingHorizontal: 16, gap: 10 },
+  quickCard: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 14, borderWidth: 1, width: 160 },
   quickIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   quickLabel: { flex: 1, fontSize: 13, fontWeight: "600" },
   chartCard: { borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1 },

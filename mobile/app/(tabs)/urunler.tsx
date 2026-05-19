@@ -20,11 +20,11 @@ import { useTheme } from "@/lib/theme";
 interface Product {
   id: string;
   name: string;
-  sku: string;
+  marketplace_product_id: string;
   stock: number;
   price: number;
-  review_score: number;
-  listing_score: number;
+  description_score: number;
+  seo_score: number;
   return_rate: number;
   marketplace: string;
 }
@@ -59,7 +59,7 @@ export default function UrunlerScreen() {
   const [products, setProducts] = useState<Product[]>([]);
   const [filtered, setFiltered] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState<"review_score" | "stock" | "return_rate">("review_score");
+  const [sortBy, setSortBy] = useState<"description_score" | "stock" | "return_rate">("description_score");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Product | null>(null);
@@ -69,9 +69,9 @@ export default function UrunlerScreen() {
     if (!user) return;
     const { data } = await supabase
       .from("products")
-      .select("id, name, sku, stock, price, review_score, listing_score, return_rate, marketplace")
+      .select("id, name, marketplace_product_id, stock, price, description_score, seo_score, return_rate, marketplace")
       .eq("seller_id", user.id)
-      .order("review_score", { ascending: true });
+      .order("description_score", { ascending: true });
     setProducts(data ?? []);
     setLoading(false);
   }
@@ -82,12 +82,12 @@ export default function UrunlerScreen() {
     let res = [...products];
     if (search.trim()) {
       const q = search.toLowerCase();
-      res = res.filter((p) => p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q));
+      res = res.filter((p) => p.name?.toLowerCase().includes(q) || p.marketplace_product_id?.toLowerCase().includes(q));
     }
     res.sort((a, b) =>
       sortBy === "stock" ? a.stock - b.stock :
       sortBy === "return_rate" ? b.return_rate - a.return_rate :
-      a.review_score - b.review_score
+      a.description_score - b.description_score
     );
     setFiltered(res);
   }, [products, search, sortBy]);
@@ -99,7 +99,7 @@ export default function UrunlerScreen() {
   }
 
   const SORTS = [
-    { label: "Düşük Puan", value: "review_score" as const },
+    { label: "Düşük Açıklama", value: "description_score" as const },
     { label: "Düşük Stok", value: "stock" as const },
     { label: "Yüksek İade", value: "return_rate" as const },
   ];
@@ -174,14 +174,14 @@ export default function UrunlerScreen() {
               </View>
               <View style={styles.productInfo}>
                 <Text style={[styles.productName, { color: t.text }]} numberOfLines={1}>{p.name}</Text>
-                <Text style={[styles.productSku, { color: t.textMuted }]}>{p.sku} · {p.marketplace}</Text>
+                <Text style={[styles.productSku, { color: t.textMuted }]}>{p.marketplace_product_id} · {p.marketplace}</Text>
               </View>
               <StockBadge stock={p.stock} />
             </View>
 
             <View style={styles.pillRow}>
-              <ScorePill score={p.review_score ?? 0} label="Yorum" />
-              <ScorePill score={p.listing_score ?? 0} label="Listeleme" />
+              <ScorePill score={p.description_score ?? 0} label="Açıklama" />
+              <ScorePill score={p.seo_score ?? 0} label="SEO" />
               {p.return_rate > 0 && (
                 <View style={[styles.pill, { backgroundColor: p.return_rate > 15 ? "#fee2e2" : t.input }]}>
                   <Text style={[styles.pillText, { color: p.return_rate > 15 ? "#dc2626" : t.textSub }]}>
@@ -216,7 +216,7 @@ export default function UrunlerScreen() {
                 <Ionicons name="cube" size={32} color={t.orange} />
               </View>
               <Text style={[styles.modalProductName, { color: t.text }]}>{selected.name}</Text>
-              <Text style={[styles.modalSku, { color: t.textMuted }]}>{selected.sku} · {selected.marketplace}</Text>
+              <Text style={[styles.modalSku, { color: t.textMuted }]}>{selected.marketplace_product_id} · {selected.marketplace}</Text>
 
               <View style={styles.modalGrid}>
                 <StatBox label="Fiyat" value={`₺${selected.price?.toLocaleString("tr-TR") ?? "—"}`} valueColor={t.text} labelColor={t.textMuted} bgColor={t.bg} />
@@ -225,16 +225,16 @@ export default function UrunlerScreen() {
               </View>
 
               <Text style={[styles.modalSectionTitle, { color: t.textSub }]}>Skor Analizi</Text>
-              <ScoreBar label="Yorum Skoru" score={selected.review_score ?? 0} labelColor={t.textSub} trackColor={t.input} />
-              <ScoreBar label="Listeleme Skoru" score={selected.listing_score ?? 0} labelColor={t.textSub} trackColor={t.input} />
+              <ScoreBar label="Açıklama Skoru" score={selected.description_score ?? 0} labelColor={t.textSub} trackColor={t.input} />
+              <ScoreBar label="SEO Skoru" score={selected.seo_score ?? 0} labelColor={t.textSub} trackColor={t.input} />
 
-              {(selected.review_score < 50 || selected.listing_score < 50) && (
+              {(selected.description_score < 50 || selected.seo_score < 50) && (
                 <View style={[styles.aiTip, { backgroundColor: t.pillBg, borderColor: "#fed7aa" }]}>
                   <Ionicons name="bulb" size={18} color={t.orange} />
                   <Text style={styles.aiTipText}>
-                    {selected.review_score < 50
-                      ? "Yorum skoru düşük — müşteri şikayetlerini incele ve ürün açıklamasını güncelle."
-                      : "Listeleme skoru düşük — başlık, görsel ve açıklama optimize edilmeli."}
+                    {selected.description_score < 50
+                      ? "Açıklama skoru düşük — ürün açıklamasını detaylandır ve anahtar kelimeleri güncelle."
+                      : "SEO skoru düşük — başlık ve açıklama arama optimizasyonu için güncellenmeli."}
                   </Text>
                 </View>
               )}

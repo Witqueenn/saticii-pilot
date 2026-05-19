@@ -3,10 +3,21 @@ import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { supabase } from "@/lib/supabase";
 import { BadgeProvider } from "@/lib/BadgeContext";
+import { ThemeProvider, useThemeContext } from "@/lib/ThemeContext";
 import { requestNotificationPermission, setupNotificationHandler } from "@/lib/notifications";
 import type { Session } from "@supabase/supabase-js";
 
 setupNotificationHandler();
+
+function ThemedApp() {
+  const { isDark } = useThemeContext();
+  return (
+    <>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <Stack screenOptions={{ headerShown: false }} />
+    </>
+  );
+}
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
@@ -38,9 +49,10 @@ export default function RootLayout() {
   }, [ready, session]);
 
   return (
-    <BadgeProvider>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </BadgeProvider>
+    <ThemeProvider>
+      <BadgeProvider>
+        <ThemedApp />
+      </BadgeProvider>
+    </ThemeProvider>
   );
 }
