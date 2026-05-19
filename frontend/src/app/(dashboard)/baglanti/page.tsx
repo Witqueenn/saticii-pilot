@@ -275,13 +275,24 @@ export default function BaglantiPage() {
   async function handleSave(platformId: string) {
     if (!userId) return;
     setSaving(platformId);
-    const supabase = createClient();
     const vals = values[platformId] ?? {};
-    await supabase.from("marketplace_credentials").upsert({
-      seller_id: userId, marketplace: platformId,
-      api_key: vals.api_key ?? "", api_secret: vals.api_secret ?? "",
-      supplier_id: vals.supplier_id ?? null, store_url: vals.store_url ?? null,
-    }, { onConflict: "seller_id,marketplace" });
+    const res = await fetch("/api/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        marketplace: platformId,
+        api_key: vals.api_key ?? "",
+        api_secret: vals.api_secret ?? "",
+        supplier_id: vals.supplier_id ?? null,
+        store_url: vals.store_url ?? null,
+      }),
+    });
+    if (!res.ok) {
+      console.error("Credential save failed:", await res.text());
+      setSaving(null);
+      return;
+    }
+    const supabase = createClient();
     const { data } = await supabase.from("marketplace_credentials").select("id, marketplace").eq("seller_id", userId);
     setConnected(data ?? []);
     setSaving(null);
@@ -292,8 +303,11 @@ export default function BaglantiPage() {
   async function handleDelete(platformId: string) {
     if (!userId) return;
     setDeleting(platformId);
-    const supabase = createClient();
-    await supabase.from("marketplace_credentials").delete().eq("seller_id", userId).eq("marketplace", platformId);
+    await fetch("/api/credentials", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ marketplace: platformId }),
+    });
     setConnected((prev) => prev.filter((c) => c.marketplace !== platformId));
     setDeleting(null);
   }
