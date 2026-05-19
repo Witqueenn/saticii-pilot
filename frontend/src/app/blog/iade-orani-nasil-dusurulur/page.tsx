@@ -114,8 +114,8 @@ export default function Article() {
             <h3 className="font-bold text-gray-900 mb-2">İade kalıplarını AI ile otomatik tespit et</h3>
             <p className="text-sm text-gray-600 mb-4">
               SatıcıPilot tüm iade verilerini analiz eder, hangi ürünün neden iade edildiğini
-              kategorize eder ve iyileştirme önerileri sunar. Ortalama iade oranımızı
-              kullanan satıcılarda %34 düşüyor.
+              kategorize eder ve iyileştirme önerileri sunar. Tekrar eden kalıpları erken
+              görüp düzeltmek iade oranını anlamlı ölçüde azaltabilir.
             </p>
             <Link
               href="/kayit"

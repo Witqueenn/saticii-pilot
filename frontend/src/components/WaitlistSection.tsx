@@ -39,7 +39,7 @@ export default function WaitlistSection() {
           Erken erişim listesine katıl
         </h2>
         <p className="text-gray-400 mb-8">
-          Lansman öncesi %50 indirim fırsatını kaçırma. 500+ satıcı zaten listede.
+          Lansman öncesi %50 indirim fırsatını kaçırma. Satıcılar erken erişim için listeye katılıyor.
         </p>
 
         {done ? (

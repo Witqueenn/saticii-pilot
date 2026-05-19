@@ -17,7 +17,7 @@ const FEATURES = [
 
 const TESTIMONIALS = [
   { name: "Ayşe K.", shop: "Ayşe Tekstil", text: "İlk haftada yanıt süremiz 3 güne düştü." },
-  { name: "Mehmet T.", shop: "MT Elektronik", text: "İade oranım %34 azaldı, hayat kurtardı." },
+  { name: "Mehmet T.", shop: "MT Elektronik", text: "İadelerin neden geldiğini ilk kez net görüyorum." },
   { name: "Selin A.", shop: "Selin Butik", text: "Rakip analizi sayesinde fiyatlarımı optimize ettim." },
 ];
 

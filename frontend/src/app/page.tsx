@@ -20,8 +20,8 @@ const features = [
     title: "İade Analizi",
     description: "Hangi ürün neden iade ediliyor? Tekrar eden kalıpları tespit eder, beden tablosu ve fotoğraf iyileştirme önerileri sunar.",
     color: "bg-red-50 text-red-600",
-    stat: "%34'e kadar",
-    statLabel: "iade azalması",
+    stat: "%30'a kadar",
+    statLabel: "iade azalması potansiyeli*",
   },
   {
     icon: Package,
@@ -29,7 +29,7 @@ const features = [
     description: "Her ürünün açıklama ve SEO puanını hesaplar. Düşük puanlı ürünler için AI ile iyileştirilmiş içerik oluşturur.",
     color: "bg-orange-50 text-orange-600",
     stat: "2x'e kadar",
-    statLabel: "daha fazla organik trafik",
+    statLabel: "organik trafik artışı potansiyeli*",
   },
 ];
 
@@ -176,7 +176,7 @@ const jsonLd = {
         {
           "@type": "Question",
           "name": "SatıcıPilot nasıl iade oranını düşürüyor?",
-          "acceptedAnswer": { "@type": "Answer", "text": "İade nedenlerini analiz ederek beden tablosu hataları, fotoğraf uyumsuzlukları ve ürün açıklama eksiklerini tespit eder. Bu sorunları gidermek iade oranını %34'e kadar düşürebilir." },
+          "acceptedAnswer": { "@type": "Answer", "text": "İade nedenlerini analiz ederek beden tablosu hataları, fotoğraf uyumsuzlukları ve ürün açıklama eksiklerini tespit eder. Bu sorunları gidermek iade oranını anlamlı ölçüde düşürebilir; sonuçlar mağaza ve kategoriye göre değişir." },
         },
       ],
     },
@@ -298,7 +298,7 @@ export default function LandingPage() {
                   </div>
                   <p className="text-xs text-gray-600 leading-relaxed">
                     "Oversize Pamuk T-Shirt" ürününe santimetre bazlı ölçü tablosu ekle.
-                    Benzer ürünlerde bu değişiklik iadeyi <strong>%34'e kadar</strong> düşürüyor.
+                    Bu tür iyileştirmeler iade oranını anlamlı ölçüde azaltabilir.
                   </p>
                 </div>
               </div>
@@ -311,9 +311,9 @@ export default function LandingPage() {
       <section className="border-y border-gray-100 bg-gray-50">
         <div className="max-w-4xl mx-auto px-6 py-8 grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
           {[
-            { icon: TrendingUp, value: "%34'e kadar", label: "iade azalması" },
-            { icon: Clock, value: "2 saate kadar", label: "günlük tasarruf" },
-            { icon: Shield, value: "500+", label: "erken erişim başvurusu" },
+            { icon: TrendingUp, value: "%30'a kadar", label: "iade azalması (pilot hedef)*" },
+            { icon: Clock, value: "2 saate kadar", label: "günlük operasyon tasarrufu*" },
+            { icon: Shield, value: "500+", label: "beta başvurusu" },
           ].map((s) => (
             <div key={s.label}>
               <p className="text-2xl md:text-3xl font-bold text-gray-900">{s.value}</p>
@@ -321,7 +321,7 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
-        <p className="text-center text-[11px] text-gray-400 pb-4">* Pilot kullanıcı verilerine göre ortalama sonuçlar. Mağaza hacmine göre değişebilir.</p>
+        <p className="text-center text-[11px] text-gray-400 pb-4">* Pilot hedefleri ve benzer AI araçlarının yayımlanmış sonuçlarına dayanır. Bireysel sonuçlar mağaza büyüklüğüne, kategoriye ve kullanım yoğunluğuna göre önemli ölçüde değişebilir.</p>
       </section>
 
       {/* Özellikler */}
