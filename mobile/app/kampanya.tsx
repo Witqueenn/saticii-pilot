@@ -18,12 +18,13 @@ import { useTheme } from "@/lib/theme";
 
 interface Campaign {
   id: string;
-  name: string;
-  type: string;
-  status: string;
-  discount_rate: number | null;
+  title: string;
+  platform: string | null;
+  discount_pct: number | null;
   start_date: string | null;
   end_date: string | null;
+  status: string;
+  notes: string | null;
   created_at: string;
 }
 
@@ -42,12 +43,11 @@ const CAMPAIGN_STATUS: Record<string, { label: string; color: string; bg: string
   taslak: { label: "Taslak", color: "#6366f1", bg: "#eef2ff", icon: "create-outline" },
 };
 
-const CAMPAIGN_TYPE_LABEL: Record<string, string> = {
-  indirim: "İndirim",
-  flash_sale: "Flash İndirim",
-  upsell: "Upsell",
-  bundle: "Paket",
-  sezon: "Sezon Kampanyası",
+const PLATFORM_LABEL: Record<string, string> = {
+  trendyol: "Trendyol",
+  hepsiburada: "Hepsiburada",
+  n11: "N11",
+  amazon: "Amazon",
 };
 
 const AUTOMATION_TRIGGER_LABEL: Record<string, string> = {
@@ -84,7 +84,7 @@ export default function KampanyaScreen() {
     const [campRes, autoRes] = await Promise.all([
       supabase
         .from("campaigns")
-        .select("id, name, type, status, discount_rate, start_date, end_date, created_at")
+        .select("id, title, platform, discount_pct, start_date, end_date, status, notes, created_at")
         .eq("seller_id", user.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -199,20 +199,22 @@ export default function KampanyaScreen() {
                 activeOpacity={0.75}
               >
                 <View style={styles.cardTop}>
-                  <Text style={[styles.cardName, { color: t.text }]} numberOfLines={1}>{c.name}</Text>
+                  <Text style={[styles.cardName, { color: t.text }]} numberOfLines={1}>{c.title}</Text>
                   <View style={[styles.badge, { backgroundColor: s.bg }]}>
                     <Ionicons name={s.icon} size={11} color={s.color} />
                     <Text style={[styles.badgeText, { color: s.color }]}>{s.label}</Text>
                   </View>
                 </View>
                 <View style={styles.cardMeta}>
-                  <View style={[styles.typePill, { backgroundColor: t.input }]}>
-                    <Text style={[styles.typeText, { color: t.textSub }]}>{CAMPAIGN_TYPE_LABEL[c.type] ?? c.type}</Text>
-                  </View>
-                  {c.discount_rate != null && (
+                  {c.platform && (
+                    <View style={[styles.typePill, { backgroundColor: t.input }]}>
+                      <Text style={[styles.typeText, { color: t.textSub }]}>{PLATFORM_LABEL[c.platform] ?? c.platform}</Text>
+                    </View>
+                  )}
+                  {c.discount_pct != null && (
                     <View style={[styles.discountPill, { backgroundColor: "#fef3c7" }]}>
                       <Ionicons name="pricetag-outline" size={11} color="#d97706" />
-                      <Text style={[styles.discountText]}>%{c.discount_rate} indirim</Text>
+                      <Text style={[styles.discountText]}>%{c.discount_pct} indirim</Text>
                     </View>
                   )}
                 </View>
@@ -275,14 +277,16 @@ export default function KampanyaScreen() {
                   <Text style={[styles.modalStatusText, { color: s.color }]}>{s.label}</Text>
                 </View>
 
-                <Text style={[styles.modalCampName, { color: t.text }]}>{selected.name}</Text>
-                <Text style={[styles.modalType, { color: t.textMuted }]}>{CAMPAIGN_TYPE_LABEL[selected.type] ?? selected.type}</Text>
+                <Text style={[styles.modalCampName, { color: t.text }]}>{selected.title}</Text>
+                {selected.notes && (
+                  <Text style={[styles.modalType, { color: t.textMuted }]}>{selected.notes}</Text>
+                )}
 
                 <View style={[styles.detailGrid, { borderColor: t.border }]}>
                   <View style={styles.detailItem}>
                     <Text style={[styles.detailLabel, { color: t.textMuted }]}>İndirim Oranı</Text>
                     <Text style={[styles.detailValue, { color: t.text }]}>
-                      {selected.discount_rate != null ? `%${selected.discount_rate}` : "—"}
+                      {selected.discount_pct != null ? `%${selected.discount_pct}` : "—"}
                     </Text>
                   </View>
                   <View style={[styles.detailDivider, { backgroundColor: t.border }]} />
