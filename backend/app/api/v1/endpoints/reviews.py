@@ -1,24 +1,17 @@
+"""
+Reviews — AI trigger endpoints only.
+
+List/read operations are handled by the dashboard directly via Supabase (RLS).
+FastAPI's role here: trigger expensive Claude analysis and enqueue Celery batch jobs.
+"""
 from fastapi import APIRouter, Depends, HTTPException
-from app.core.database import get_supabase
+from app.core.database import get_supabase, get_supabase_admin
 from app.core.security import get_current_user
 from app.services.ai_service import analyze_review
-from app.models.review import Review, ReviewAnalysis
+from app.models.review import ReviewAnalysis
+from app.workers.tasks.review_tasks import analyze_seller_reviews
 
 router = APIRouter()
-
-
-@router.get("/", response_model=list[dict])
-def list_reviews(
-    urgent_only: bool = False,
-    limit: int = 50,
-    seller_id: str = Depends(get_current_user),
-):
-    db = get_supabase()
-    query = db.table("reviews").select("*").eq("seller_id", seller_id)
-    if urgent_only:
-        query = query.eq("is_urgent", True)
-    result = query.order("reviewed_at", desc=True).limit(limit).execute()
-    return result.data
 
 
 @router.post("/{review_id}/analyze", response_model=ReviewAnalysis)
@@ -26,6 +19,7 @@ def analyze_single_review(
     review_id: str,
     seller_id: str = Depends(get_current_user),
 ):
+    """Run Claude analysis on one review and persist the result."""
     db = get_supabase()
     review = (
         db.table("reviews")
@@ -45,7 +39,7 @@ def analyze_single_review(
         product_name=r["product_name"],
     )
 
-    db.table("reviews").update({
+    get_supabase_admin().table("reviews").update({
         "sentiment": analysis.sentiment,
         "is_urgent": analysis.is_urgent,
         "ai_summary": analysis.summary,
@@ -55,34 +49,8 @@ def analyze_single_review(
     return analysis
 
 
-@router.patch("/{review_id}/reply")
-def mark_as_replied(
-    review_id: str,
-    seller_id: str = Depends(get_current_user),
-):
-    db = get_supabase()
-    db.table("reviews").update({"is_replied": True}).eq("id", review_id).eq("seller_id", seller_id).execute()
-    return {"status": "ok"}
-
-
-@router.get("/daily-summary")
-def daily_summary(seller_id: str = Depends(get_current_user)):
-    db = get_supabase()
-    reviews = (
-        db.table("reviews")
-        .select("sentiment, is_urgent, is_replied")
-        .eq("seller_id", seller_id)
-        .execute()
-    )
-    data = reviews.data
-    return {
-        "total": len(data),
-        "urgent": sum(1 for r in data if r["is_urgent"]),
-        "pending_reply": sum(1 for r in data if not r["is_replied"]),
-        "sentiment_breakdown": {
-            "olumlu": sum(1 for r in data if r["sentiment"] == "olumlu"),
-            "notr": sum(1 for r in data if r["sentiment"] == "notr"),
-            "olumsuz": sum(1 for r in data if r["sentiment"] == "olumsuz"),
-            "acil": sum(1 for r in data if r["sentiment"] == "acil"),
-        },
-    }
+@router.post("/batch-analyze")
+def enqueue_batch_analysis(seller_id: str = Depends(get_current_user)):
+    """Enqueue a Celery task to process all unanalyzed reviews for this seller."""
+    analyze_seller_reviews.delay(seller_id)
+    return {"status": "queued"}
