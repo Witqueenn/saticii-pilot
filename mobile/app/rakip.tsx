@@ -258,9 +258,13 @@ export default function RakipScreen() {
   const [modalVisible, setModalVisible] = useState(false);
 
   async function load() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+
     const { data, error } = await supabase
       .from("competitor_prices")
       .select("*")
+      .eq("seller_id", user.id)
       .order("checked_at", { ascending: false });
 
     if (!error && data) {

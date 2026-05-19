@@ -16,9 +16,8 @@ interface Response {
   comment: string | null;
   email: string | null;
   phone: string | null;
-  wants_newsletter: boolean;
-  product_ref: string | null;
-  order_ref: string | null;
+  is_newsletter: boolean;
+  product_name: string | null;
   created_at: string;
 }
 
@@ -85,8 +84,8 @@ export default function MusteriScreen() {
       const c = map.get(key)!;
       c.responseCount += 1;
       c.avgRating = (c.avgRating * (c.responseCount - 1) + r.rating) / c.responseCount;
-      if (r.product_ref && !c.products.includes(r.product_ref)) c.products.push(r.product_ref);
-      if (r.wants_newsletter) c.isNewsletter = true;
+      if (r.product_name && !c.products.includes(r.product_name)) c.products.push(r.product_name);
+      if (r.is_newsletter) c.isNewsletter = true;
       if (r.created_at > c.lastSeen) c.lastSeen = r.created_at;
       c.responses.push(r);
     }
