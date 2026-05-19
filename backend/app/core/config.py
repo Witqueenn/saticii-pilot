@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 gün
 
+    # CORS — comma-separated origins, e.g. https://saticipilot.com,https://saticii-pilot.vercel.app
+    cors_origins: list[str] = ["http://localhost:3000"]
+
     # Trendyol API
     trendyol_api_url: str = "https://api.trendyol.com/sapigw"
 
