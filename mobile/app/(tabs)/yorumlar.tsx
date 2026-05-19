@@ -1,0 +1,434 @@
+import { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ScrollView,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { supabase } from "@/lib/supabase";
+import { SkeletonCard } from "@/lib/Skeleton";
+import { useBadges } from "@/lib/BadgeContext";
+import { useTheme } from "@/lib/theme";
+
+interface Review {
+  id: string;
+  rating: number;
+  comment: string;
+  product_name: string;
+  status: string;
+  created_at: string;
+  reply?: string;
+}
+
+const FILTERS = [
+  { label: "Tümü", value: "all" },
+  { label: "Acil", value: "acil" },
+  { label: "Bekliyor", value: "cevaplanmadi" },
+  { label: "Cevaplandı", value: "cevaplandi" },
+];
+
+const QUICK_REPLIES = [
+  { label: "Teşekkür", text: "Değerli yorumunuz için teşekkür ederiz! Memnuniyetiniz bizim için çok önemli. 😊" },
+  { label: "Özür", text: "Yaşadığınız deneyim için özür dileriz. Sorununuzu çözmek için size ulaşacağız." },
+  { label: "Kargo", text: "Kargo sürecindeki aksama için üzgünüz. Lojistik ekibimiz bilgilendirildi." },
+  { label: "İade", text: "İade talebinizi aldık. Müşteri hizmetlerimiz en kısa sürede iletişime geçecek." },
+];
+
+const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
+  acil: { label: "Acil", color: "#dc2626", bg: "#fee2e2" },
+  cevaplanmadi: { label: "Bekliyor", color: "#d97706", bg: "#fef3c7" },
+  cevaplandi: { label: "Cevaplandı", color: "#059669", bg: "#d1fae5" },
+};
+
+function aiDraftReply(rating: number): string {
+  if (rating <= 2) {
+    return "Değerli müşterimiz, yaşadığınız olumsuz deneyim için içtenlikle özür dileriz. Bu durumu en kısa sürede düzeltmek için müşteri hizmetlerimiz sizinle iletişime geçecek. Güveninizi yeniden kazanmak için elimizden geleni yapacağız.";
+  }
+  if (rating === 3) {
+    return "Yorumunuz için teşekkür ederiz! Deneyiminizi daha iyi hale getirmek için geri bildirimlerinizi dikkate alıyoruz. Herhangi bir sorunuz olursa bize ulaşmaktan çekinmeyin. Sizi bir sonraki alışverişte daha memnun etmek dileğiyle!";
+  }
+  return "Harika yorumunuz için çok teşekkür ederiz! 🌟 Memnuniyetiniz bizim en büyük motivasyonumuz. Kaliteli ürünlerimiz ve hizmetimizle her zaman yanınızda olmaya devam edeceğiz. Sizi tekrar mağazamızda görmek dileğiyle!";
+}
+
+export default function YorumlarScreen() {
+  const t = useTheme();
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [filtered, setFiltered] = useState<Review[]>([]);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selected, setSelected] = useState<Review | null>(null);
+  const [reply, setReply] = useState("");
+  const [replying, setReplying] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const { refresh: refreshBadges } = useBadges();
+
+  async function load() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("reviews")
+      .select("id, rating, comment, product_name, status, created_at, reply")
+      .eq("seller_id", user.id)
+      .order("created_at", { ascending: false });
+    setReviews(data ?? []);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    let res = reviews;
+    if (filter !== "all") res = res.filter((r) => r.status === filter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      res = res.filter(
+        (r) => r.product_name?.toLowerCase().includes(q) || r.comment?.toLowerCase().includes(q)
+      );
+    }
+    setFiltered(res);
+  }, [reviews, filter, search]);
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
+  function openReview(r: Review) {
+    Haptics.selectionAsync();
+    setSelected(r);
+    setReply(r.reply ?? "");
+  }
+
+  async function suggestAIReply() {
+    if (!selected) return;
+    Haptics.selectionAsync();
+    setAiLoading(true);
+    await new Promise((r) => setTimeout(r, 1400));
+    setReply(aiDraftReply(selected.rating));
+    setAiLoading(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  async function submitReply() {
+    if (!selected || !reply.trim()) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setReplying(true);
+    await supabase
+      .from("reviews")
+      .update({ reply: reply.trim(), status: "cevaplandi" })
+      .eq("id", selected.id);
+    setReviews((prev) =>
+      prev.map((r) => r.id === selected.id ? { ...r, reply: reply.trim(), status: "cevaplandi" } : r)
+    );
+    setReplying(false);
+    setSelected(null);
+    refreshBadges();
+    Alert.alert("Yanıt gönderildi ✓");
+  }
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]} edges={["top"]}>
+        <View style={[styles.header, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
+          <Text style={[styles.title, { color: t.text }]}>Yorumlar</Text>
+        </View>
+        <View style={{ padding: 16 }}>
+          {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]} edges={["top"]}>
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
+        <Text style={[styles.title, { color: t.text }]}>Yorumlar</Text>
+        <View style={[styles.countBadge, { backgroundColor: t.input }]}>
+          <Text style={[styles.countText, { color: t.textSub }]}>{filtered.length}</Text>
+        </View>
+      </View>
+
+      {/* Search */}
+      <View style={[styles.searchWrap, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
+        <Ionicons name="search" size={16} color={t.textMuted} style={{ marginRight: 8 }} />
+        <TextInput
+          style={[styles.search, { backgroundColor: t.input, color: t.text }]}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Ürün veya yorum ara..."
+          placeholderTextColor={t.textMuted}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch("")}>
+            <Ionicons name="close-circle" size={18} color={t.textMuted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Filters */}
+      <View style={[styles.filters, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
+        {FILTERS.map((f) => (
+          <TouchableOpacity
+            key={f.value}
+            style={[styles.filterBtn, { backgroundColor: t.input }, filter === f.value && { backgroundColor: t.orange }]}
+            onPress={() => { Haptics.selectionAsync(); setFilter(f.value); }}
+          >
+            <Text style={[styles.filterText, { color: t.textSub }, filter === f.value && styles.filterTextActive]}>
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <FlatList
+        data={filtered}
+        keyExtractor={(r) => r.id}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.orange} />}
+        renderItem={({ item: r }) => {
+          const s = STATUS_STYLE[r.status];
+          const isNegative = r.rating <= 2;
+          return (
+            <TouchableOpacity
+              style={[
+                styles.card,
+                { backgroundColor: t.card, borderLeftColor: s?.color ?? t.border, borderLeftWidth: 3 },
+              ]}
+              onPress={() => openReview(r)}
+              activeOpacity={0.75}
+            >
+              <View style={styles.cardTop}>
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <Ionicons key={i} name={i <= r.rating ? "star" : "star-outline"} size={14}
+                      color={isNegative ? "#ef4444" : t.orange} />
+                  ))}
+                </View>
+                {s && (
+                  <View style={[styles.badge, { backgroundColor: s.bg }]}>
+                    <Text style={[styles.badgeText, { color: s.color }]}>{s.label}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.product, { color: t.text }]} numberOfLines={1}>{r.product_name}</Text>
+              <Text style={[styles.comment, { color: t.textSub }]} numberOfLines={2}>{r.comment}</Text>
+              {r.reply && (
+                <View style={styles.replyPreview}>
+                  <Ionicons name="return-down-forward" size={12} color="#059669" />
+                  <Text style={styles.replyPreviewText} numberOfLines={1}>{r.reply}</Text>
+                </View>
+              )}
+              <View style={styles.cardBottom}>
+                <Text style={[styles.date, { color: t.textMuted }]}>
+                  {new Date(r.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
+                </Text>
+                <View style={styles.tapHint}>
+                  <Text style={[styles.tapHintText, { color: t.textMuted }]}>Yanıtla</Text>
+                  <Ionicons name="chevron-forward" size={12} color={t.textMuted} />
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name="chatbubble-outline" size={48} color={t.textMuted} />
+            <Text style={[styles.emptyText, { color: t.textMuted }]}>Yorum bulunamadı</Text>
+          </View>
+        }
+      />
+
+      {/* Detail Modal */}
+      <Modal visible={!!selected} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelected(null)}>
+        <SafeAreaView style={[styles.modalSafe, { backgroundColor: t.card }]} edges={["top"]}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+            <View style={[styles.modalHeader, { borderBottomColor: t.border }]}>
+              <TouchableOpacity onPress={() => setSelected(null)} style={[styles.modalClose, { backgroundColor: t.input }]}>
+                <Ionicons name="close" size={22} color={t.textSub} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: t.text }]}>Yorum Detayı</Text>
+              <View style={{ width: 36 }} />
+            </View>
+
+            {selected && (
+              <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 40 }}>
+                {/* Stars + status */}
+                <View style={styles.modalTopRow}>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Ionicons key={i} name={i <= selected.rating ? "star" : "star-outline"} size={20}
+                        color={selected.rating <= 2 ? "#ef4444" : t.orange} />
+                    ))}
+                  </View>
+                  {STATUS_STYLE[selected.status] && (
+                    <View style={[styles.badge, { backgroundColor: STATUS_STYLE[selected.status].bg }]}>
+                      <Text style={[styles.badgeText, { color: STATUS_STYLE[selected.status].color }]}>
+                        {STATUS_STYLE[selected.status].label}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <Text style={[styles.modalProduct, { color: t.text }]}>{selected.product_name}</Text>
+                <Text style={[styles.modalDate, { color: t.textMuted }]}>
+                  {new Date(selected.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+                </Text>
+
+                <View style={[styles.modalCommentBox, { backgroundColor: t.bg }]}>
+                  <Text style={[styles.modalComment, { color: t.textSub }]}>{selected.comment}</Text>
+                </View>
+
+                {/* Previous reply */}
+                {selected.reply && (
+                  <View style={styles.previousReply}>
+                    <View style={styles.previousReplyHeader}>
+                      <Ionicons name="return-down-forward" size={14} color="#059669" />
+                      <Text style={styles.previousReplyLabel}>Önceki yanıtın</Text>
+                    </View>
+                    <Text style={styles.previousReplyText}>{selected.reply}</Text>
+                  </View>
+                )}
+
+                {/* AI Suggestion */}
+                <TouchableOpacity
+                  style={[styles.aiBtn, { backgroundColor: t.orange + "12", borderColor: t.orange + "40" }]}
+                  onPress={suggestAIReply}
+                  disabled={aiLoading}
+                  activeOpacity={0.75}
+                >
+                  {aiLoading ? (
+                    <ActivityIndicator size="small" color={t.orange} />
+                  ) : (
+                    <Ionicons name="flash" size={15} color={t.orange} />
+                  )}
+                  <Text style={[styles.aiBtnText, { color: t.orange }]}>
+                    {aiLoading ? "AI yanıt üretiyor…" : "AI Yanıt Öner"}
+                  </Text>
+                  <View style={[styles.proBadge, { backgroundColor: t.orange }]}>
+                    <Text style={styles.proBadgeText}>PRO</Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Quick reply templates */}
+                <Text style={[styles.replyLabel, { color: t.textSub }]}>Hızlı Şablonlar</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.templatesRow} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+                  {QUICK_REPLIES.map((tmpl) => (
+                    <TouchableOpacity
+                      key={tmpl.label}
+                      style={[styles.templateBtn, { backgroundColor: t.input, borderColor: t.borderStrong }]}
+                      onPress={() => { Haptics.selectionAsync(); setReply(tmpl.text); }}
+                    >
+                      <Text style={[styles.templateBtnText, { color: t.textSub }]}>{tmpl.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Reply input */}
+                <Text style={[styles.replyLabel, { marginTop: 12, color: t.textSub }]}>
+                  {selected.reply ? "Yanıtı güncelle" : "Yanıt yaz"}
+                </Text>
+                <TextInput
+                  style={[styles.replyInput, { backgroundColor: t.bg, borderColor: t.borderStrong, color: t.text }]}
+                  value={reply}
+                  onChangeText={setReply}
+                  placeholder="Müşteriye yanıtınızı yazın..."
+                  placeholderTextColor={t.textMuted}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+
+                <TouchableOpacity
+                  style={[styles.replyBtn, { backgroundColor: t.orange }, (!reply.trim() || replying) && styles.replyBtnDisabled]}
+                  onPress={submitReply}
+                  disabled={!reply.trim() || replying}
+                >
+                  {replying
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <>
+                        <Ionicons name="send" size={16} color="#fff" />
+                        <Text style={styles.replyBtnText}>Yanıtı Gönder</Text>
+                      </>
+                  }
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1 },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomWidth: 1 },
+  title: { fontSize: 22, fontWeight: "800" },
+  countBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3 },
+  countText: { fontSize: 13, fontWeight: "600" },
+  searchWrap: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, gap: 8 },
+  search: { flex: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14 },
+  filters: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  filterBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+  filterText: { fontSize: 13, fontWeight: "500" },
+  filterTextActive: { color: "#fff", fontWeight: "700" },
+  list: { padding: 16, gap: 12, paddingBottom: 32 },
+  card: { borderRadius: 16, padding: 16, shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  starsRow: { flexDirection: "row", gap: 2 },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
+  badgeText: { fontSize: 11, fontWeight: "700" },
+  product: { fontSize: 12, fontWeight: "600", marginBottom: 6 },
+  comment: { fontSize: 14, lineHeight: 20, marginBottom: 8 },
+  replyPreview: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#f0fdf4", borderRadius: 8, padding: 8, marginBottom: 8 },
+  replyPreviewText: { fontSize: 12, color: "#059669", flex: 1 },
+  cardBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  date: { fontSize: 11 },
+  tapHint: { flexDirection: "row", alignItems: "center", gap: 2 },
+  tapHintText: { fontSize: 12 },
+  empty: { alignItems: "center", paddingTop: 80, gap: 12 },
+  emptyText: { fontSize: 15 },
+  // Modal
+  modalSafe: { flex: 1 },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
+  modalClose: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  modalTitle: { fontSize: 16, fontWeight: "700" },
+  modalBody: { flex: 1, padding: 20 },
+  modalTopRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  modalProduct: { fontSize: 18, fontWeight: "700", marginBottom: 4 },
+  modalDate: { fontSize: 13, marginBottom: 16 },
+  modalCommentBox: { borderRadius: 14, padding: 16, marginBottom: 20 },
+  modalComment: { fontSize: 15, lineHeight: 22 },
+  previousReply: { backgroundColor: "#f0fdf4", borderRadius: 14, padding: 14, marginBottom: 20 },
+  previousReplyHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
+  previousReplyLabel: { fontSize: 12, fontWeight: "700", color: "#059669" },
+  previousReplyText: { fontSize: 14, color: "#374151", lineHeight: 20 },
+  replyLabel: { fontSize: 14, fontWeight: "700", marginBottom: 10 },
+  replyInput: { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, minHeight: 120, marginBottom: 16 },
+  replyBtn: { borderRadius: 14, paddingVertical: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  replyBtnDisabled: { opacity: 0.5 },
+  replyBtnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
+  templatesRow: { marginBottom: 4 },
+  templateBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  templateBtnText: { fontSize: 13, fontWeight: "600" },
+  aiBtn: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16 },
+  aiBtnText: { flex: 1, fontSize: 14, fontWeight: "700" },
+  proBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  proBadgeText: { color: "#fff", fontSize: 9, fontWeight: "800", letterSpacing: 0.5 },
+});

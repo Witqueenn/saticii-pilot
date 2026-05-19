@@ -68,36 +68,38 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "599",
-    yearlyNote: "Yıllık ödemede ₺499/ay",
+    price: "799",
+    yearlyNote: null,
     desc: "Büyüyen satıcılar için",
     features: [
       "Temel planın her şeyi",
-      "Rakip Fiyat Analizi",
-      "Müşteri Takibi & QR Form",
-      "AI Yorum Yanıtlama",
-      "Haftalık E-posta Raporu",
-      "WooCommerce & Shopify Bağlantısı",
-      "Instagram Mention Takibi",
-      "Öncelikli Destek",
+      "Sınırsız yorum yönetimi",
+      "AI yorum yanıtlama",
+      "Rakip fiyat & yorum analizi",
+      "Haftalık e-posta raporu",
+      "Müşteri takibi & QR form",
+      "Tüm pazaryeri bağlantıları",
+      "Öncelikli destek",
     ],
     highlight: true,
     cta: "14 Gün Ücretsiz Dene",
   },
   {
     name: "Marketing",
-    price: "999",
-    yearlyNote: "Yıllık ödemede ₺799/ay",
-    desc: "Müşteri kazanmak isteyenler için",
+    price: "1999",
+    yearlyNote: null,
+    desc: "Büyük satıcılar ve ajanslar için",
     features: [
       "Pro planın her şeyi",
-      "Kampanya Planlayıcı",
-      "Müşteri E-posta Kampanyaları",
-      "İndirim Kodu Üretici",
-      "AI Kampanya Önerisi",
+      "Kampanya planlayıcı",
+      "E-posta & SMS kampanyası",
+      "Otomasyon & AI içerik üretimi",
+      "Çoklu mağaza yönetimi",
+      "API erişimi",
+      "Dedike hesap yöneticisi",
     ],
     highlight: false,
-    cta: "14 Gün Ücretsiz Dene",
+    cta: "Satış Ekibiyle Görüş",
   },
 ];
 
@@ -193,6 +195,9 @@ export default function LandingPage() {
             <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">Erken Erişim</span>
           </div>
           <div className="flex items-center gap-4">
+            <Link href="/fiyatlar" className="text-sm text-gray-600 hover:text-gray-900 transition-colors hidden sm:block">
+              Fiyatlar
+            </Link>
             <Link href="/giris" className="text-sm text-gray-600 hover:text-gray-900 transition-colors hidden sm:block">
               Giriş Yap
             </Link>
@@ -515,21 +520,36 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/kayit"
-                  className={`block text-center py-3 rounded-xl font-semibold text-sm transition-all ${
-                    p.highlight
-                      ? "bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-200"
-                      : "border-2 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {p.cta}
-                </Link>
+                {p.cta === "Satış Ekibiyle Görüş" ? (
+                  <a
+                    href="mailto:satis@saticipilot.com?subject=Marketing Plan"
+                    className="block text-center py-3 rounded-xl font-semibold text-sm transition-all border-2 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                  >
+                    {p.cta}
+                  </a>
+                ) : (
+                  <Link
+                    href={p.highlight ? "/kayit?plan=profesyonel" : "/kayit"}
+                    className={`block text-center py-3 rounded-xl font-semibold text-sm transition-all ${
+                      p.highlight
+                        ? "bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-200"
+                        : "border-2 border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-50"
+                    }`}
+                  >
+                    {p.cta}
+                  </Link>
+                )}
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      <div className="text-center -mt-8 mb-4">
+        <Link href="/fiyatlar" className="text-sm text-orange-600 font-medium hover:underline">
+          Tüm özellikleri karşılaştır →
+        </Link>
+      </div>
 
       {/* Waitlist — erken erişim indirimi */}
       <WaitlistSection />

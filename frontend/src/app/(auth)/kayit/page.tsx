@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, CheckCircle, Mail } from "lucide-react";
+import { Loader2, CheckCircle, Mail, Gift } from "lucide-react";
 
-export default function KayitPage() {
+function KayitForm() {
   const [shopName, setShopName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const searchParams = useSearchParams();
+  const refCode = searchParams.get("ref") ?? "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,14 +28,18 @@ export default function KayitPage() {
     }
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { error, data } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { shop_name: shopName },
+        data: { shop_name: shopName, referred_by: refCode || null },
         emailRedirectTo: `${location.origin}/auth/callback`,
       },
     });
+
+    if (!error && data.user && refCode) {
+      await supabase.rpc("apply_referral", { ref_code: refCode, new_user_id: data.user.id }).maybeSingle();
+    }
 
     if (error) {
       setError(error.message === "User already registered"
@@ -79,6 +86,13 @@ export default function KayitPage() {
         <h2 className="text-2xl font-bold text-gray-900">14 gün ücretsiz başla</h2>
         <p className="text-gray-500 text-sm mt-1">Kredi kartı gerekmez, kurulum yok</p>
       </div>
+
+      {refCode && (
+        <div className="flex items-center gap-2.5 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mb-5">
+          <Gift className="w-4 h-4 text-orange-500 flex-shrink-0" />
+          <p className="text-sm text-orange-700 font-medium">Davet kodu uygulandı — Pro planı ücretsiz dene!</p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -135,7 +149,7 @@ export default function KayitPage() {
 
       <p className="text-xs text-gray-400 text-center mt-4">
         Kayıt olarak{" "}
-        <a href="#" className="hover:underline">Kullanım Şartları</a>'nı kabul etmiş olursun.
+        <a href="#" className="hover:underline">Kullanım Şartları</a>&apos;nı kabul etmiş olursun.
       </p>
 
       <p className="text-sm text-gray-500 text-center mt-4">
@@ -145,5 +159,13 @@ export default function KayitPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function KayitPage() {
+  return (
+    <Suspense>
+      <KayitForm />
+    </Suspense>
   );
 }

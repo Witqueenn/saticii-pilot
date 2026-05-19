@@ -126,6 +126,7 @@ export default function YorumlarPage() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("tumu");
   const [drafting, setDrafting] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [editingReply, setEditingReply] = useState<Record<string, string>>({});
 
   // CSV import state
   const [showImport, setShowImport] = useState(false);
@@ -179,10 +180,15 @@ export default function YorumlarPage() {
         setReviews((prev) =>
           prev.map((rev) => (rev.id === r.id ? { ...rev, suggested_reply: reply } : rev))
         );
+        setEditingReply((prev) => ({ ...prev, [r.id]: reply }));
       }
     } finally {
       setDrafting(null);
     }
+  }
+
+  function getReplyText(r: Review): string {
+    return editingReply[r.id] ?? r.suggested_reply ?? "";
   }
 
   async function copyToClipboard(id: string, text: string) {
@@ -362,12 +368,18 @@ export default function YorumlarPage() {
               <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 leading-relaxed">{r.comment}</p>
 
               {r.suggested_reply && !r.is_replied && (
-                <div className="border border-orange-200 rounded-lg p-4 bg-orange-50 space-y-2">
-                  <p className="text-xs text-orange-600 font-medium flex items-center gap-1">
+                <div className="border border-orange-200 rounded-lg p-4 bg-orange-50 space-y-3">
+                  <p className="text-xs text-orange-600 font-semibold flex items-center gap-1">
                     <Sparkles className="w-3 h-3" /> AI Cevap Taslağı
+                    <span className="ml-1 text-orange-400 font-normal">— düzenleyebilirsiniz</span>
                   </p>
-                  <p className="text-sm text-orange-900 leading-relaxed">{r.suggested_reply}</p>
-                  <div className="flex gap-2 pt-1 flex-wrap">
+                  <textarea
+                    value={getReplyText(r)}
+                    onChange={(e) => setEditingReply((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                    rows={3}
+                    className="w-full text-sm text-orange-900 leading-relaxed bg-white border border-orange-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                  <div className="flex gap-2 flex-wrap">
                     <button
                       onClick={() => markReplied(r.id)}
                       className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-colors"
@@ -375,7 +387,7 @@ export default function YorumlarPage() {
                       ✓ Cevapladım
                     </button>
                     <button
-                      onClick={() => copyToClipboard(r.id, r.suggested_reply!)}
+                      onClick={() => copyToClipboard(r.id, getReplyText(r))}
                       className="text-xs text-orange-600 border border-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-100 transition-colors flex items-center gap-1"
                     >
                       <Copy className="w-3 h-3" />

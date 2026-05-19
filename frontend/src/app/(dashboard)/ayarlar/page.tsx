@@ -2,24 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, CheckCircle, CreditCard, Store, Bell, AlertTriangle, Mail, Phone, Globe } from "lucide-react";
+import {
+  Loader2, CheckCircle, CreditCard, Store, Bell, AlertTriangle,
+  Mail, Phone, Gift, Copy, Users, Zap, UserCircle, Settings2,
+} from "lucide-react";
+import Link from "next/link";
 
 const planLabel: Record<string, string> = {
-  temel: "Temel",
-  profesyonel: "Pro",
-  marketing: "Marketing",
+  temel: "Temel", profesyonel: "Pro", marketing: "Marketing",
 };
-
 const planColor: Record<string, string> = {
   temel: "bg-gray-100 text-gray-700",
   profesyonel: "bg-orange-100 text-orange-700",
   marketing: "bg-indigo-100 text-indigo-700",
 };
-
 const planFeatures: Record<string, string[]> = {
-  temel: ["Yorum merkezi", "İade takibi", "Ürün yönetimi", "Pazaryeri bağlantısı"],
-  profesyonel: ["Temel + Rakip Analizi", "Müşteri Takibi & QR Form", "AI Yorum Yanıtlama", "Haftalık E-posta Raporu"],
-  marketing: ["Pro planın her şeyi", "Kampanya Planlayıcı", "E-posta & SMS Kampanyası", "Otomasyon & AI İçerik"],
+  temel: ["Yorum merkezi (50/ay)", "İade takibi", "Ürün yönetimi", "Trendyol bağlantısı"],
+  profesyonel: ["Sınırsız yorum", "AI yorum yanıtlama", "Rakip analizi", "Haftalık rapor", "Tüm pazaryerler"],
+  marketing: ["Pro'nun her şeyi", "Kampanya planlayıcı", "E-posta & SMS", "API erişimi", "Dedike hesap yöneticisi"],
 };
 
 interface Toggle {
@@ -27,14 +27,12 @@ interface Toggle {
   label: string;
   desc: string;
 }
-
 const TOGGLES: Toggle[] = [
   { key: "notify_urgent_reviews", label: "Acil yorum bildirimi", desc: "1 yıldız yorum geldiğinde anında e-posta al" },
   { key: "notify_weekly_report", label: "Haftalık rapor", desc: "Her pazartesi haftalık özet e-postası al" },
   { key: "notify_new_returns", label: "Yeni iade bildirimi", desc: "Yeni iade talebi oluştuğunda e-posta al" },
   { key: "notify_low_stock", label: "Düşük stok uyarısı", desc: "Ürün stoğu kritik seviyeye düştüğünde bildirim al" },
 ];
-
 type NotifState = Record<Toggle["key"], boolean>;
 
 function getInitials(name: string, fallback: string) {
@@ -44,11 +42,17 @@ function getInitials(name: string, fallback: string) {
   return src.slice(0, 2).toUpperCase();
 }
 
+type Tab = "profil" | "bildirimler" | "plan" | "ekip";
+
 export default function AyarlarPage() {
+  const [tab, setTab] = useState<Tab>("profil");
   const [shopName, setShopName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [plan, setPlan] = useState("temel");
+  const [referralCode, setReferralCode] = useState("");
+  const [referralCount, setReferralCount] = useState(0);
+  const [copied, setCopied] = useState(false);
   const [notifs, setNotifs] = useState<NotifState>({
     notify_urgent_reviews: true,
     notify_weekly_report: true,
@@ -58,8 +62,6 @@ export default function AyarlarPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [savingPhone, setSavingPhone] = useState(false);
-  const [savedPhone, setSavedPhone] = useState(false);
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,16 +69,12 @@ export default function AyarlarPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       setEmail(user.email ?? "");
       setShopName(user.user_metadata?.shop_name ?? "");
-
       const { data: seller } = await supabase
         .from("sellers")
-        .select("plan, notify_urgent_reviews, notify_weekly_report, notify_new_returns, notify_low_stock, phone")
-        .eq("id", user.id)
-        .single();
-
+        .select("plan, notify_urgent_reviews, notify_weekly_report, notify_new_returns, notify_low_stock, phone, referral_code, referral_count")
+        .eq("id", user.id).single();
       if (seller) {
         setPlan(seller.plan ?? "temel");
         setPhone(seller.phone ?? "");
@@ -86,6 +84,14 @@ export default function AyarlarPage() {
           notify_new_returns: seller.notify_new_returns ?? false,
           notify_low_stock: seller.notify_low_stock ?? false,
         });
+        setReferralCount(seller.referral_count ?? 0);
+        if (seller.referral_code) {
+          setReferralCode(seller.referral_code);
+        } else {
+          const code = "SP" + Math.random().toString(36).toUpperCase().slice(2, 8);
+          await supabase.from("sellers").update({ referral_code: code }).eq("id", user.id);
+          setReferralCode(code);
+        }
       }
       setLoading(false);
     }
@@ -105,18 +111,6 @@ export default function AyarlarPage() {
     setTimeout(() => setSaved(false), 3000);
   }
 
-  async function savePhone(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingPhone(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    await supabase.from("sellers").update({ phone }).eq("id", user.id);
-    setSavingPhone(false);
-    setSavedPhone(true);
-    setTimeout(() => setSavedPhone(false), 3000);
-  }
-
   async function toggleNotif(key: Toggle["key"], value: boolean) {
     setTogglingKey(key);
     setNotifs((p) => ({ ...p, [key]: value }));
@@ -126,26 +120,35 @@ export default function AyarlarPage() {
     setTogglingKey(null);
   }
 
+  function copyReferral() {
+    navigator.clipboard.writeText(`https://saticipilot.com/beta?ref=${referralCode}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-      </div>
-    );
+    return <div className="flex items-center justify-center h-64"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>;
   }
 
   const initials = getInitials(shopName, email);
+
+  const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
+    { id: "profil", label: "Profil", icon: UserCircle },
+    { id: "bildirimler", label: "Bildirimler", icon: Bell },
+    { id: "plan", label: "Plan & Fatura", icon: CreditCard },
+    { id: "ekip", label: "Ekip", icon: Users },
+  ];
 
   return (
     <div className="space-y-6 max-w-2xl w-full">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Ayarlar</h2>
-        <p className="text-gray-500 mt-1 text-sm">Hesap ve mağaza bilgilerini yönet</p>
+        <p className="text-gray-500 mt-1 text-sm">Hesap bilgileri, bildirim tercihleri ve plan yönetimi.</p>
       </div>
 
       {/* Profile header */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 flex items-center gap-4">
-        <div className="w-14 h-14 rounded-full bg-orange-500 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+      <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
           {initials}
         </div>
         <div className="min-w-0">
@@ -157,128 +160,215 @@ export default function AyarlarPage() {
         </div>
       </div>
 
-      {/* Mağaza + iletişim bilgileri */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-5">
-          <Store className="w-4 h-4 text-gray-500" />
-          <h3 className="font-semibold text-gray-900">Mağaza & İletişim</h3>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+              tab === id ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="hidden sm:inline">{label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Tab: Profil */}
+      {tab === "profil" && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Store className="w-4 h-4 text-gray-500" />
+            <h3 className="font-semibold text-gray-900">Mağaza & İletişim</h3>
+          </div>
+          <p className="text-xs text-gray-400 mb-5">Bu bilgiler müşterilere gönderilen otomatik cevaplarda kullanılır.</p>
+          <form onSubmit={saveProfile} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Mağaza Adı</label>
+              <input
+                type="text" value={shopName} onChange={(e) => setShopName(e.target.value)} required
+                placeholder="Örn: Ayşe Tekstil"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> E-posta</span>
+              </label>
+              <input type="email" value={email} disabled
+                className="w-full px-4 py-2.5 border border-gray-100 rounded-xl text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
+              />
+              <p className="text-xs text-gray-400 mt-1">Değişiklik için destek@saticipilot.com ile iletişime geç.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Telefon</span>
+              </label>
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="05xxxxxxxxx"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
+              />
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <button type="submit" disabled={saving}
+                className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 transition-colors"
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+              </button>
+              {saved && <span className="flex items-center gap-1.5 text-sm text-green-600"><CheckCircle className="w-4 h-4" /> Kaydedildi</span>}
+            </div>
+          </form>
         </div>
-        <form onSubmit={saveProfile} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Mağaza Adı</label>
-            <input
-              type="text"
-              value={shopName}
-              onChange={(e) => setShopName(e.target.value)}
-              placeholder="Örn: Ayşe Tekstil"
-              required
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-            />
-          </div>
+      )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5" /> E-posta</span>
-            </label>
-            <input
-              type="email"
-              value={email}
-              disabled
-              className="w-full px-4 py-2.5 border border-gray-100 rounded-xl text-sm bg-gray-50 text-gray-400 cursor-not-allowed"
-            />
-            <p className="text-xs text-gray-400 mt-1">E-posta değişikliği için destek@saticipilot.com ile iletişime geç.</p>
+      {/* Tab: Bildirimler */}
+      {tab === "bildirimler" && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Bell className="w-4 h-4 text-gray-500" />
+            <h3 className="font-semibold text-gray-900">Bildirim Tercihleri</h3>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5" /> Telefon</span>
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="05xxxxxxxxx"
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
-            />
-            <p className="text-xs text-gray-400 mt-1">SMS bildirimleri için kullanılır.</p>
+          <p className="text-xs text-gray-400 mb-5">
+            Bildirimler <strong className="text-gray-600">{email}</strong> adresine gönderilir.
+          </p>
+          <div className="space-y-5">
+            {TOGGLES.map((t) => (
+              <div key={t.key} className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800">{t.label}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{t.desc}</p>
+                </div>
+                <button
+                  onClick={() => toggleNotif(t.key, !notifs[t.key])}
+                  disabled={togglingKey === t.key}
+                  className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 ${notifs[t.key] ? "bg-orange-500" : "bg-gray-200"}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifs[t.key] ? "translate-x-5" : "translate-x-0"}`} />
+                </button>
+              </div>
+            ))}
           </div>
+        </div>
+      )}
 
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center gap-2 bg-orange-500 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-orange-600 disabled:opacity-60 transition-colors"
-            >
-              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
-            </button>
-            {saved && (
-              <span className="flex items-center gap-1.5 text-sm text-green-600">
-                <CheckCircle className="w-4 h-4" /> Kaydedildi
+      {/* Tab: Plan & Fatura */}
+      {tab === "plan" && (
+        <div className="space-y-4">
+          {/* Mevcut plan */}
+          <div className={`rounded-xl p-6 ${plan === "temel" ? "bg-gray-900" : "bg-gradient-to-br from-orange-500 to-orange-600"}`}>
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div>
+                <p className="text-xs font-medium text-white/60 uppercase tracking-wide mb-1">Mevcut planın</p>
+                <h3 className="text-2xl font-black text-white">{planLabel[plan] ?? plan}</h3>
+                {plan === "temel" && (
+                  <p className="text-sm text-white/60 mt-0.5">Sonsuza kadar ücretsiz</p>
+                )}
+              </div>
+              <span className={`text-xs px-3 py-1 rounded-full font-semibold ${planColor[plan] ?? planColor.temel}`}>
+                {planLabel[plan] ?? plan}
               </span>
+            </div>
+            <ul className="space-y-2 mb-4">
+              {(planFeatures[plan] ?? planFeatures.temel).map((f) => (
+                <li key={f} className="flex items-center gap-2 text-sm text-white/80">
+                  <CheckCircle className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            {plan !== "marketing" && (
+              <Link
+                href="/fiyatlar"
+                className="inline-flex items-center gap-2 bg-white text-gray-900 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+              >
+                <Zap className="w-3.5 h-3.5 text-orange-500" />
+                Planı Yükselt
+              </Link>
             )}
           </div>
-        </form>
-      </div>
 
-      {/* Bildirimler */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Bell className="w-4 h-4 text-gray-500" />
-          <h3 className="font-semibold text-gray-900">Bildirimler</h3>
-        </div>
-        <p className="text-xs text-gray-400 mb-5">Bildirimler <strong className="text-gray-600">{email}</strong> adresine gönderilir.</p>
-        <div className="space-y-5">
-          {TOGGLES.map((t) => (
-            <div key={t.key} className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-800">{t.label}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{t.desc}</p>
+          {/* Fatura */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Faturalandırma</h3>
+            <div className="space-y-3">
+              {[
+                { label: "Ödeme yöntemi", desc: "Henüz kart eklenmedi · deneme süresi sonunda gerekecek", cta: "Kart Ekle" },
+                { label: "Fatura adresi", desc: "Türkiye · KOBİ / Şahıs", cta: "Düzenle" },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between gap-4 py-3 border-b border-gray-100 last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{row.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{row.desc}</p>
+                  </div>
+                  <a
+                    href="mailto:destek@saticipilot.com"
+                    className="flex-shrink-0 px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    {row.cta}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Referral */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Gift className="w-4 h-4 text-orange-500" />
+              <h3 className="font-semibold text-gray-900">Arkadaşını Davet Et</h3>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">
+              Davet ettiğin her satıcı Pro plana geçtiğinde <strong className="text-orange-600">1 ay ücretsiz Pro</strong> kazanırsın.
+            </p>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 font-mono text-sm text-gray-700 truncate select-all">
+                saticipilot.com/beta?ref={referralCode}
               </div>
               <button
-                onClick={() => toggleNotif(t.key, !notifs[t.key])}
-                disabled={togglingKey === t.key}
-                className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 ${notifs[t.key] ? "bg-orange-500" : "bg-gray-200"}`}
+                onClick={copyReferral}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium flex-shrink-0 transition-colors ${copied ? "bg-green-500 text-white" : "bg-orange-500 text-white hover:bg-orange-600"}`}
               >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifs[t.key] ? "translate-x-5" : "translate-x-0"}`}
-                />
+                {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copied ? "Kopyalandı" : "Kopyala"}
               </button>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Plan bilgisi */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <CreditCard className="w-4 h-4 text-gray-500" />
-            <h3 className="font-semibold text-gray-900">Aktif Plan</h3>
+            <div className="flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-xl px-4 py-2.5">
+              <Users className="w-4 h-4 text-orange-500 flex-shrink-0" />
+              <p className="text-sm text-orange-700">
+                Şu ana kadar <strong>{referralCount}</strong> kişiyi davet ettin.
+              </p>
+            </div>
           </div>
-          <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${planColor[plan] ?? planColor.temel}`}>
-            {planLabel[plan] ?? plan}
-          </span>
         </div>
-        <ul className="space-y-2 mb-4">
-          {(planFeatures[plan] ?? planFeatures.temel).map((f) => (
-            <li key={f} className="flex items-center gap-2 text-sm text-gray-600">
-              <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-              {f}
-            </li>
-          ))}
-        </ul>
-        {plan !== "marketing" && (
-          <a
-            href="mailto:destek@saticipilot.com?subject=Plan Yükseltme"
-            className="inline-flex items-center gap-1.5 text-sm text-orange-600 font-medium hover:text-orange-700 transition-colors"
-          >
-            Planı yükselt <Globe className="w-3.5 h-3.5" />
-          </a>
-        )}
-      </div>
+      )}
 
-      {/* Tehlike bölgesi */}
+      {/* Tab: Ekip */}
+      {tab === "ekip" && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="w-4 h-4 text-gray-500" />
+            <h3 className="font-semibold text-gray-900">Ekip Üyeleri</h3>
+          </div>
+          <p className="text-xs text-gray-400 mb-5">Mağazana erişimi olan kişileri yönet.</p>
+
+          <div className="flex flex-col items-center py-8 text-center gap-3">
+            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
+              <Settings2 className="w-6 h-6 text-gray-300" />
+            </div>
+            <p className="text-sm font-medium text-gray-700">Ekip yönetimi yakında</p>
+            <p className="text-xs text-gray-400 max-w-xs">Birden fazla kullanıcıyı aynı mağazaya bağlama özelliği Marketing planda aktif olacak.</p>
+            {plan !== "marketing" && (
+              <Link href="/fiyatlar" className="text-xs text-orange-600 font-semibold hover:underline">
+                Marketing plana geç →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Danger zone */}
       <div className="bg-white rounded-xl border border-red-200 p-6">
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="w-4 h-4 text-red-500" />
