@@ -27,9 +27,17 @@ interface Review {
   rating: number;
   comment: string;
   product_name: string;
-  status: string;
+  customer_name?: string;
+  is_replied: boolean;
+  is_urgent: boolean;
+  suggested_reply?: string;
   created_at: string;
-  reply?: string;
+}
+
+function reviewStatus(r: Review): "acil" | "cevaplanmadi" | "cevaplandi" {
+  if (r.is_replied) return "cevaplandi";
+  if (r.is_urgent) return "acil";
+  return "cevaplanmadi";
 }
 
 const FILTERS = [
@@ -81,7 +89,7 @@ export default function YorumlarScreen() {
     if (!user) return;
     const { data } = await supabase
       .from("reviews")
-      .select("id, rating, comment, product_name, status, created_at, reply")
+      .select("id, rating, comment, product_name, customer_name, is_replied, is_urgent, suggested_reply, created_at")
       .eq("seller_id", user.id)
       .order("created_at", { ascending: false });
     setReviews(data ?? []);
@@ -92,7 +100,9 @@ export default function YorumlarScreen() {
 
   useEffect(() => {
     let res = reviews;
-    if (filter !== "all") res = res.filter((r) => r.status === filter);
+    if (filter === "acil") res = res.filter((r) => r.is_urgent && !r.is_replied);
+    else if (filter === "cevaplanmadi") res = res.filter((r) => !r.is_replied);
+    else if (filter === "cevaplandi") res = res.filter((r) => r.is_replied);
     if (search.trim()) {
       const q = search.toLowerCase();
       res = res.filter(
@@ -111,7 +121,7 @@ export default function YorumlarScreen() {
   function openReview(r: Review) {
     Haptics.selectionAsync();
     setSelected(r);
-    setReply(r.reply ?? "");
+    setReply(r.suggested_reply ?? "");
   }
 
   async function suggestAIReply() {
@@ -130,10 +140,10 @@ export default function YorumlarScreen() {
     setReplying(true);
     await supabase
       .from("reviews")
-      .update({ reply: reply.trim(), status: "cevaplandi" })
+      .update({ suggested_reply: reply.trim(), is_replied: true })
       .eq("id", selected.id);
     setReviews((prev) =>
-      prev.map((r) => r.id === selected.id ? { ...r, reply: reply.trim(), status: "cevaplandi" } : r)
+      prev.map((r) => r.id === selected.id ? { ...r, suggested_reply: reply.trim(), is_replied: true } : r)
     );
     setReplying(false);
     setSelected(null);
@@ -202,7 +212,7 @@ export default function YorumlarScreen() {
         contentContainerStyle={styles.list}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.orange} />}
         renderItem={({ item: r }) => {
-          const s = STATUS_STYLE[r.status];
+          const s = STATUS_STYLE[reviewStatus(r)];
           const isNegative = r.rating <= 2;
           return (
             <TouchableOpacity
@@ -228,10 +238,10 @@ export default function YorumlarScreen() {
               </View>
               <Text style={[styles.product, { color: t.text }]} numberOfLines={1}>{r.product_name}</Text>
               <Text style={[styles.comment, { color: t.textSub }]} numberOfLines={2}>{r.comment}</Text>
-              {r.reply && (
+              {r.suggested_reply && (
                 <View style={styles.replyPreview}>
                   <Ionicons name="return-down-forward" size={12} color="#059669" />
-                  <Text style={styles.replyPreviewText} numberOfLines={1}>{r.reply}</Text>
+                  <Text style={styles.replyPreviewText} numberOfLines={1}>{r.suggested_reply}</Text>
                 </View>
               )}
               <View style={styles.cardBottom}>
@@ -276,10 +286,10 @@ export default function YorumlarScreen() {
                         color={selected.rating <= 2 ? "#ef4444" : t.orange} />
                     ))}
                   </View>
-                  {STATUS_STYLE[selected.status] && (
-                    <View style={[styles.badge, { backgroundColor: STATUS_STYLE[selected.status].bg }]}>
-                      <Text style={[styles.badgeText, { color: STATUS_STYLE[selected.status].color }]}>
-                        {STATUS_STYLE[selected.status].label}
+                  {STATUS_STYLE[reviewStatus(selected)] && (
+                    <View style={[styles.badge, { backgroundColor: STATUS_STYLE[reviewStatus(selected)].bg }]}>
+                      <Text style={[styles.badgeText, { color: STATUS_STYLE[reviewStatus(selected)].color }]}>
+                        {STATUS_STYLE[reviewStatus(selected)].label}
                       </Text>
                     </View>
                   )}
@@ -295,13 +305,13 @@ export default function YorumlarScreen() {
                 </View>
 
                 {/* Previous reply */}
-                {selected.reply && (
+                {selected.suggested_reply && (
                   <View style={styles.previousReply}>
                     <View style={styles.previousReplyHeader}>
                       <Ionicons name="return-down-forward" size={14} color="#059669" />
                       <Text style={styles.previousReplyLabel}>Önceki yanıtın</Text>
                     </View>
-                    <Text style={styles.previousReplyText}>{selected.reply}</Text>
+                    <Text style={styles.previousReplyText}>{selected.suggested_reply}</Text>
                   </View>
                 )}
 
@@ -341,7 +351,7 @@ export default function YorumlarScreen() {
 
                 {/* Reply input */}
                 <Text style={[styles.replyLabel, { marginTop: 12, color: t.textSub }]}>
-                  {selected.reply ? "Yanıtı güncelle" : "Yanıt yaz"}
+                  {selected.suggested_reply ? "Yanıtı güncelle" : "Yanıt yaz"}
                 </Text>
                 <TextInput
                   style={[styles.replyInput, { backgroundColor: t.bg, borderColor: t.borderStrong, color: t.text }]}

@@ -98,8 +98,8 @@ export default function DashboardScreen() {
     const avgRating = reviews.length
       ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
       : "—";
-    const pendingCount = returns.filter((r) => r.status === "beklemede").length;
-    const unrepliedCount = reviews.filter((r) => r.status === "cevaplanmadi").length;
+    const pendingCount = returns.filter((r: any) => r.status === "beklemede").length;
+    const unrepliedCount = reviews.filter((r: any) => !r.is_replied).length;
     setPendingReturns(pendingCount);
     setUnreplied(unrepliedCount);
 
@@ -123,10 +123,10 @@ export default function DashboardScreen() {
 
     const { data: urgentData } = await supabase
       .from("reviews")
-      .select("id, rating, comment, product_name, status, created_at")
+      .select("id, rating, comment, product_name, is_replied, is_urgent, created_at")
       .eq("seller_id", user.id)
       .lte("rating", 2)
-      .eq("status", "cevaplanmadi")
+      .eq("is_replied", false)
       .order("created_at", { ascending: false })
       .limit(3);
 
