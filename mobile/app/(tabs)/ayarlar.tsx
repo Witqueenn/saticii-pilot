@@ -106,21 +106,37 @@ export default function AyarlarScreen() {
     return connected.some((c) => c.marketplace === platformId);
   }
 
+  async function credentialsApiCall(method: "POST" | "DELETE", body: object) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
+    const res = await fetch(`${apiUrl}/api/credentials`, {
+      method,
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(await res.text());
+  }
+
   async function handleConnect(platformId: string) {
     setSaving(true);
-    await supabase.from("marketplace_credentials").upsert({
-      seller_id: userId,
-      marketplace: platformId,
-      api_key: fieldValues.api_key ?? "",
-      api_secret: fieldValues.api_secret ?? "",
-      supplier_id: fieldValues.supplier_id ?? null,
-    }, { onConflict: "seller_id,marketplace" });
-    const { data } = await supabase.from("marketplace_credentials").select("id, marketplace").eq("seller_id", userId);
-    setConnected(data ?? []);
-    setSaving(false);
-    setConnectModal(null);
-    setFieldValues({});
-    Alert.alert("Bağlandı ✓", `${PLATFORMS.find(p => p.id === platformId)?.name} başarıyla bağlandı.`);
+    try {
+      await credentialsApiCall("POST", {
+        marketplace: platformId,
+        api_key: fieldValues.api_key ?? "",
+        api_secret: fieldValues.api_secret ?? "",
+        supplier_id: fieldValues.supplier_id ?? null,
+      });
+      const { data } = await supabase.from("marketplace_credentials").select("id, marketplace").eq("seller_id", userId);
+      setConnected(data ?? []);
+      setConnectModal(null);
+      setFieldValues({});
+      Alert.alert("Bağlandı ✓", `${PLATFORMS.find(p => p.id === platformId)?.name} başarıyla bağlandı.`);
+    } catch {
+      Alert.alert("Hata", "Bağlantı kaydedilemedi. Lütfen tekrar dene.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDisconnect(platformId: string) {
@@ -132,7 +148,11 @@ export default function AyarlarScreen() {
         {
           text: "Kes", style: "destructive", onPress: async () => {
             setDisconnecting(platformId);
-            await supabase.from("marketplace_credentials").delete().eq("seller_id", userId).eq("marketplace", platformId);
+            try {
+              await credentialsApiCall("DELETE", { marketplace: platformId });
+            } catch {
+              await supabase.from("marketplace_credentials").delete().eq("seller_id", userId).eq("marketplace", platformId);
+            }
             setConnected((prev) => prev.filter((c) => c.marketplace !== platformId));
             setDisconnecting(null);
           }

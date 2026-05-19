@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.database import get_supabase
+from app.core.security import get_current_user
 from app.services.ai_service import analyze_review
 from app.models.review import Review, ReviewAnalysis
 
@@ -8,9 +9,9 @@ router = APIRouter()
 
 @router.get("/", response_model=list[dict])
 def list_reviews(
-    seller_id: str,
     urgent_only: bool = False,
     limit: int = 50,
+    seller_id: str = Depends(get_current_user),
 ):
     db = get_supabase()
     query = db.table("reviews").select("*").eq("seller_id", seller_id)
@@ -21,9 +22,19 @@ def list_reviews(
 
 
 @router.post("/{review_id}/analyze", response_model=ReviewAnalysis)
-def analyze_single_review(review_id: str):
+def analyze_single_review(
+    review_id: str,
+    seller_id: str = Depends(get_current_user),
+):
     db = get_supabase()
-    review = db.table("reviews").select("*").eq("id", review_id).single().execute()
+    review = (
+        db.table("reviews")
+        .select("*")
+        .eq("id", review_id)
+        .eq("seller_id", seller_id)
+        .single()
+        .execute()
+    )
     if not review.data:
         raise HTTPException(status_code=404, detail="Yorum bulunamadı")
 
@@ -45,14 +56,17 @@ def analyze_single_review(review_id: str):
 
 
 @router.patch("/{review_id}/reply")
-def mark_as_replied(review_id: str):
+def mark_as_replied(
+    review_id: str,
+    seller_id: str = Depends(get_current_user),
+):
     db = get_supabase()
-    db.table("reviews").update({"is_replied": True}).eq("id", review_id).execute()
+    db.table("reviews").update({"is_replied": True}).eq("id", review_id).eq("seller_id", seller_id).execute()
     return {"status": "ok"}
 
 
 @router.get("/daily-summary")
-def daily_summary(seller_id: str):
+def daily_summary(seller_id: str = Depends(get_current_user)):
     db = get_supabase()
     reviews = (
         db.table("reviews")

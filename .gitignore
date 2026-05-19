@@ -3,6 +3,12 @@
 .env.local
 backend/.env
 frontend/.env.local
+mobile/.env
+
+# .example dosyaları commit'lenebilir (gerçek değer yok)
+!.env.example
+!*.env.example
+!.env.local.example
 
 # Python
 __pycache__/

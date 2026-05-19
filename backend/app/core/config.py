@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
     supabase_service_role_key: str = ""
+    supabase_jwt_secret: str = ""  # Settings → API → JWT Secret
 
     # Database (direct PostgreSQL for Celery/SQLAlchemy)
     database_url: str = ""
@@ -34,6 +35,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 
 settings = Settings()
