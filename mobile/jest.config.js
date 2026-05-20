@@ -18,6 +18,8 @@ module.exports = {
   // tsconfig.json'daki @/* alias'ını Jest'e tanıt
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
+    "^@react-native-async-storage/async-storage$":
+      require.resolve("@react-native-async-storage/async-storage/jest/async-storage-mock"),
   },
   testMatch: [
     "**/__tests__/**/*.{ts,tsx}",
