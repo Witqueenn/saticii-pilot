@@ -1,21 +1,52 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+function generateNonce(): string {
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array));
+}
+
+function buildCsp(nonce: string): string {
+  return [
+    "default-src 'self'",
+    // nonce whitelists Next.js bootstrap + our scripts; strict-dynamic lets
+    // those scripts load further chunks without needing per-URL allowlisting
+    `script-src 'nonce-${nonce}' 'strict-dynamic'`,
+    // unsafe-inline kept for Next.js critical CSS injection (font optimization)
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.anthropic.com",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
 export async function middleware(request: NextRequest) {
+  const nonce = generateNonce();
+  const csp = buildCsp(nonce);
+
+  // x-nonce is read by Next.js to nonce its own bootstrap scripts,
+  // and by our server components for any inline <script> tags.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.next({ request });
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
   }
 
-  let supabaseResponse = NextResponse.next({ request });
+  let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() { return request.cookies.getAll(); },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        supabaseResponse = NextResponse.next({ request });
+        supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } });
         cookiesToSet.forEach(({ name, value, options }) =>
           supabaseResponse.cookies.set(name, value, options)
         );
@@ -28,24 +59,31 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith("/giris") || pathname.startsWith("/kayit");
   const isAdminPage = pathname.startsWith("/admin");
-  const isPublic = pathname === "/" || isAuthPage || pathname.startsWith("/auth") || pathname === "/sifre-sifirla" || pathname.startsWith("/api/") || pathname.startsWith("/blog");
+  const isPublic =
+    pathname === "/" ||
+    isAuthPage ||
+    pathname.startsWith("/auth") ||
+    pathname === "/sifre-sifirla" ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/blog");
   const isProtected = !isPublic;
 
-  // Giriş yapmamış → /giris
   if (!user && isProtected) {
     const url = request.nextUrl.clone();
     url.pathname = "/giris";
-    return NextResponse.redirect(url);
+    const redirect = NextResponse.redirect(url);
+    redirect.headers.set("Content-Security-Policy", csp);
+    return redirect;
   }
 
-  // Giriş yapmış → auth sayfalarına erişemez
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
     url.pathname = "/genel";
-    return NextResponse.redirect(url);
+    const redirect = NextResponse.redirect(url);
+    redirect.headers.set("Content-Security-Policy", csp);
+    return redirect;
   }
 
-  // Admin sayfası kontrolü
   if (user && isAdminPage) {
     const { data: adminCheck } = await supabase
       .from("admin_users")
@@ -56,10 +94,13 @@ export async function middleware(request: NextRequest) {
     if (!adminCheck) {
       const url = request.nextUrl.clone();
       url.pathname = "/genel";
-      return NextResponse.redirect(url);
+      const redirect = NextResponse.redirect(url);
+      redirect.headers.set("Content-Security-Policy", csp);
+      return redirect;
     }
   }
 
+  supabaseResponse.headers.set("Content-Security-Policy", csp);
   return supabaseResponse;
 }
 

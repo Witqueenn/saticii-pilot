@@ -38,7 +38,7 @@ export function SearchModal({ visible, onClose }: Props) {
   const [results, setResults] = useState<Result[]>([]);
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<TextInput>(null);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (visible) {

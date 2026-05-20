@@ -1,6 +1,14 @@
+import sentry_sdk
 from celery import Celery
 from celery.schedules import crontab
 from app.core.config import settings
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        traces_sample_rate=0.1,
+        environment="production" if not settings.debug else "development",
+    )
 
 celery_app = Celery(
     "satici_pilot",

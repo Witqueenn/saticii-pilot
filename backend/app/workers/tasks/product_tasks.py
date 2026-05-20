@@ -1,6 +1,12 @@
+import logging
+
+import sentry_sdk
+
 from app.workers.celery_app import celery_app
 from app.core.database import get_supabase_admin
 from app.services.ai_service import analyze_product_description
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="app.workers.tasks.product_tasks.analyze_all_products")
@@ -15,7 +21,6 @@ def analyze_all_products():
 def analyze_seller_products(seller_id: str):
     db = get_supabase_admin()
 
-    # Sadece henüz analiz edilmemiş veya puanı düşük ürünleri işle
     products = (
         db.table("products")
         .select("*")
@@ -25,6 +30,7 @@ def analyze_seller_products(seller_id: str):
         .execute()
     )
 
+    failures = 0
     for product in products.data:
         try:
             analysis = analyze_product_description(
@@ -39,4 +45,14 @@ def analyze_seller_products(seller_id: str):
                 "improved_description": analysis.improved_description,
             }).eq("id", product["id"]).execute()
         except Exception:
-            pass
+            failures += 1
+            logger.exception(
+                "Ürün analiz başarısız: product_id=%s seller_id=%s",
+                product["id"], seller_id,
+            )
+            sentry_sdk.capture_exception()
+
+    if failures:
+        raise RuntimeError(
+            f"{failures}/{len(products.data)} ürün analiz edilemedi: seller_id={seller_id}"
+        )

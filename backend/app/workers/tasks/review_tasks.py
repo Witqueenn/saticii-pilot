@@ -1,6 +1,12 @@
+import logging
+
+import sentry_sdk
+
 from app.workers.celery_app import celery_app
 from app.core.database import get_supabase_admin
 from app.services.ai_service import analyze_review
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="app.workers.tasks.review_tasks.analyze_all_sellers_reviews")
@@ -27,6 +33,7 @@ def analyze_seller_reviews(seller_id: str):
         .execute()
     )
 
+    failures = 0
     for review in reviews.data:
         try:
             analysis = analyze_review(
@@ -41,4 +48,14 @@ def analyze_seller_reviews(seller_id: str):
                 "suggested_reply": analysis.suggested_reply,
             }).eq("id", review["id"]).execute()
         except Exception:
-            pass
+            failures += 1
+            logger.exception(
+                "Yorum analiz başarısız: review_id=%s seller_id=%s",
+                review["id"], seller_id,
+            )
+            sentry_sdk.capture_exception()
+
+    if failures:
+        raise RuntimeError(
+            f"{failures}/{len(reviews.data)} yorum analiz edilemedi: seller_id={seller_id}"
+        )

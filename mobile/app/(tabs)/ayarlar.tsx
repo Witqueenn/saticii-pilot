@@ -224,7 +224,7 @@ export default function AyarlarScreen() {
             <View style={styles.upgradeLeft}>
               <Ionicons name="flash" size={20} color="#fff" />
               <View>
-                <Text style={styles.upgradeTitle}>Pro'ya geç</Text>
+                <Text style={styles.upgradeTitle}>{"Pro'ya geç"}</Text>
                 <Text style={styles.upgradeSub}>14 gün ücretsiz dene · ₺799/ay</Text>
               </View>
             </View>
@@ -326,7 +326,7 @@ export default function AyarlarScreen() {
             <Text style={[styles.referralTitle, { color: t.text }]}>Davet Et, Ödül Kazan</Text>
           </View>
           <Text style={[styles.referralDesc, { color: t.textSub }]}>
-            Her Pro'ya geçen davetinde{" "}
+            {"Her Pro'ya geçen davetinde"}{" "}
             <Text style={{ color: t.orange, fontWeight: "700" }}>1 ay ücretsiz Pro</Text> kazanırsın.
           </Text>
 
@@ -418,7 +418,7 @@ export default function AyarlarScreen() {
                   <Text style={[styles.platformModalInitials, { color: platform.color }]}>{platform.initials}</Text>
                 </View>
                 <Text style={[styles.modalDesc, { color: t.textSub }]}>
-                  API bilgilerini girerek {platform.name} mağazanı SatıcıPilot'a bağla.
+                  {"API bilgilerini girerek "}{platform.name}{" mağazanı SatıcıPilot'a bağla."}
                 </Text>
 
                 {platform.fields.map((field) => (

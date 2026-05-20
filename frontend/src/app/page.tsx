@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import {
   MessageSquare, RotateCcw, Package, ChevronRight,
@@ -155,9 +156,9 @@ const jsonLd = {
       "operatingSystem": "Web",
       "description": "Trendyol satıcıları için yorum yönetimi, iade takibi ve ürün optimizasyonu platformu",
       "offers": [
-        { "@type": "Offer", "name": "Temel", "price": "499", "priceCurrency": "TRY", "billingDuration": "P1M" },
-        { "@type": "Offer", "name": "Profesyonel", "price": "999", "priceCurrency": "TRY", "billingDuration": "P1M" },
-        { "@type": "Offer", "name": "Kurumsal", "price": "2499", "priceCurrency": "TRY", "billingDuration": "P1M" },
+        { "@type": "Offer", "name": "Temel", "price": "0", "priceCurrency": "TRY", "availability": "https://schema.org/InStock" },
+        { "@type": "Offer", "name": "Pro", "price": "799", "priceCurrency": "TRY", "billingDuration": "P1M" },
+        { "@type": "Offer", "name": "Marketing", "price": "1999", "priceCurrency": "TRY", "billingDuration": "P1M" },
       ],
     },
     {
@@ -183,10 +184,11 @@ const jsonLd = {
   ],
 };
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const nonce = (await headers()).get("x-nonce") ?? "";
   return (
     <div className="min-h-screen bg-white">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" nonce={nonce} dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {/* Nav */}
       <nav className="border-b border-gray-100 px-6 py-4 sticky top-0 bg-white/90 backdrop-blur-sm z-10">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
