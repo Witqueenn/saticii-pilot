@@ -95,15 +95,13 @@ export default function DashboardScreen() {
     setShopName(user.user_metadata?.shop_name ?? user.email?.split("@")[0] ?? "Mağaza");
     setSellerId(user.id);
 
-    const [reviewsRes, returnsRes, productsRes] = await Promise.all([
+    const [reviewsRes, returnsRes] = await Promise.all([
       supabase.from("reviews").select("id, rating, is_replied, is_urgent, created_at").eq("seller_id", user.id),
       supabase.from("returns").select("id").eq("seller_id", user.id),
-      supabase.from("products").select("id").eq("seller_id", user.id),
     ]);
 
     const reviews = reviewsRes.data ?? [];
     const returns = returnsRes.data ?? [];
-    const products = productsRes.data ?? [];
 
     const avgRating = reviews.length
       ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)

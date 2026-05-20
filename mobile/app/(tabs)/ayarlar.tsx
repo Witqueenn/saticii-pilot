@@ -56,7 +56,7 @@ const planColor: Record<string, string> = {
 
 export default function AyarlarScreen() {
   const t = useTheme();
-  const { mode, setMode, isDark } = useThemeContext();
+  const { setMode, isDark } = useThemeContext();
   const [email, setEmail] = useState("");
   const [shopName, setShopName] = useState("");
   const [plan, setPlan] = useState("temel");

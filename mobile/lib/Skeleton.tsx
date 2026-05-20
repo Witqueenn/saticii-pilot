@@ -11,7 +11,7 @@ export function Skeleton({ width, height, style }: { width: number | string; hei
         Animated.timing(anim, { toValue: 0.3, duration: 700, useNativeDriver: true }),
       ])
     ).start();
-  }, []);
+  }, [anim]);
 
   return (
     <Animated.View

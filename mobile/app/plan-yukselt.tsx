@@ -8,8 +8,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useTheme } from "@/lib/theme";
 
-type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
-
 const PLANS = [
   {
     id: "temel",

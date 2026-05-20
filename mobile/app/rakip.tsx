@@ -250,7 +250,6 @@ function EmptyState({ t }: { t: ReturnType<typeof useTheme> }) {
 
 export default function RakipScreen() {
   const t = useTheme();
-  const [rows, setRows] = useState<CompetitorRow[]>([]);
   const [groups, setGroups] = useState<ProductGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -268,7 +267,6 @@ export default function RakipScreen() {
       .order("checked_at", { ascending: false });
 
     if (!error && data) {
-      setRows(data as CompetitorRow[]);
       setGroups(groupRows(data as CompetitorRow[]));
     }
     setLoading(false);
@@ -298,8 +296,6 @@ export default function RakipScreen() {
 
   // ── Render item ──
   function renderGroup({ item }: { item: ProductGroup }) {
-    const status = getStatus(item.our_price, item.minCompetitorPrice);
-
     return (
       <TouchableOpacity
         style={[styles.card, { backgroundColor: t.card, borderColor: t.borderStrong }]}

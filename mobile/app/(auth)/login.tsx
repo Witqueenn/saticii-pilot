@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -26,23 +26,7 @@ export default function LoginScreen() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    checkBiometric();
-  }, []);
-
-  async function checkBiometric() {
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
-    const enabled = await AsyncStorage.getItem(BIOMETRIC_KEY);
-    if (compatible && enrolled && enabled === "true") {
-      setBiometricAvailable(true);
-      tryBiometric();
-    } else if (compatible && enrolled) {
-      setBiometricAvailable(true);
-    }
-  }
-
-  async function tryBiometric() {
+  const tryBiometric = useCallback(async () => {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: "SatıcıPilot'a giriş yap",
       fallbackLabel: "Şifre kullan",
@@ -55,7 +39,22 @@ export default function LoginScreen() {
         Alert.alert("Oturum süresi dolmuş", "Lütfen tekrar giriş yapın.");
       }
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    async function checkBiometric() {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      const enabled = await AsyncStorage.getItem(BIOMETRIC_KEY);
+      if (compatible && enrolled && enabled === "true") {
+        setBiometricAvailable(true);
+        tryBiometric();
+      } else if (compatible && enrolled) {
+        setBiometricAvailable(true);
+      }
+    }
+    checkBiometric();
+  }, [tryBiometric]);
 
   async function handleSubmit() {
     if (!email || !password) return;
