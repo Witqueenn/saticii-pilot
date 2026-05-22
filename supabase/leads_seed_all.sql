@@ -1,5 +1,5 @@
--- SatıcıPilot — Tüm Potansiyel Lead'ler (165 lead)
--- Tarih: 2026-05-19
+-- SatıcıPilot — Tüm Potansiyel Lead'ler (212 lead)
+-- Tarih: 2026-05-20
 -- Çalıştırmadan önce mevcut leadleri sil: DELETE FROM leads;
 
 INSERT INTO leads (shop_name, marketplace, contact_email, contact_phone, store_url, status, source, notes) VALUES
