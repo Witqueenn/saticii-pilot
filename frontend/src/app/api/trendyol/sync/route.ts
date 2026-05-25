@@ -234,6 +234,174 @@ async function syncOrders(
   return { synced, errors };
 }
 
+// ── Yorum senkronizasyonu ─────────────────────────────────────────────────────
+
+interface TyReview {
+  id:                number | string;
+  productId?:        number | string;
+  productBarcode?:   string;
+  productName?:      string;
+  productModelName?: string;
+  rate?:             number;
+  starCount?:        number;
+  text?:             string;
+  comment?:          string;
+  sellerName?:       string;
+  userFullName?:     string;
+  sellerComment?:    string;
+  reply?:            string;
+  reviewDate?:       string;
+  creationDate?:     string;
+}
+
+function parseTyDate(raw: string | undefined | null): string {
+  if (!raw) return new Date().toISOString();
+  // ISO with offset → direct
+  if (/T.*[Z+\-]\d{2}/.test(raw)) return new Date(raw).toISOString();
+  // "2024-01-15T12:00:00" without tz → assume UTC
+  if (/^\d{4}-\d{2}-\d{2}T/.test(raw)) return new Date(raw + "Z").toISOString();
+  // "2024-01-15"
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(raw + "T00:00:00Z").toISOString();
+  return new Date().toISOString();
+}
+
+async function syncReviews(
+  db: SupabaseClient,
+  sellerId: string,
+  supplierId: string,
+  headers: Record<string, string>,
+): Promise<{ synced: number; errors: string[] }> {
+  const errors: string[] = [];
+  let synced = 0;
+  let page = 0;
+  const size = 100;
+  const endMs   = Date.now();
+  const startMs = endMs - 90 * 86400 * 1000; // son 90 gün
+
+  while (true) {
+    const params = new URLSearchParams({
+      page: String(page), size: String(size),
+      orderByField: "CreatedDate", orderByDirection: "DESC",
+      startDate: String(startMs), endDate: String(endMs),
+    });
+    const url = `${TY_BASE}/suppliers/${supplierId}/reviews?${params}`;
+    let res: Response;
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch (e) {
+      errors.push(`Yorum sayfa ${page} isteği başarısız: ${e}`);
+      break;
+    }
+    if (!res.ok) { errors.push(`Yorum API hatası: ${res.status} ${res.statusText}`); break; }
+
+    const body = await res.json() as { content: TyReview[]; totalPages: number };
+    const items = body.content ?? [];
+    if (items.length === 0) break;
+
+    const rows = items.map((r) => {
+      const rating = r.rate ?? r.starCount ?? 3;
+      return {
+        seller_id:             sellerId,
+        marketplace:           "trendyol",
+        marketplace_review_id: String(r.id),
+        product_id:            String(r.productId ?? r.productBarcode ?? ""),
+        product_name:          r.productName ?? r.productModelName ?? "",
+        rating,
+        comment:               r.text ?? r.comment ?? "",
+        customer_name:         r.sellerName ?? r.userFullName ?? "",
+        is_urgent:             rating <= 2,
+        is_replied:            !!(r.sellerComment ?? r.reply),
+        reviewed_at:           parseTyDate(r.reviewDate ?? r.creationDate),
+      };
+    });
+
+    const { error } = await db.from("reviews")
+      .upsert(rows, { onConflict: "seller_id,marketplace,marketplace_review_id", ignoreDuplicates: false });
+    if (error) errors.push(`Yorum kaydetme hatası: ${error.message}`);
+    else synced += rows.length;
+
+    if (page >= (body.totalPages ?? 1) - 1 || items.length < size) break;
+    page++;
+  }
+
+  return { synced, errors };
+}
+
+// ── Soru senkronizasyonu ──────────────────────────────────────────────────────
+
+interface TyQuestion {
+  id?:                 number | string;
+  questionId?:         number | string;
+  productId?:          number | string;
+  productContentId?:   number | string;
+  productName?:        string;
+  productModelName?:   string;
+  text?:               string;
+  questionText?:       string;
+  publicQuestion?:     string;
+  question?:           string;
+  status?:             string;
+  answers?:            unknown[];
+  createdDate?:        string;
+  askDate?:            string;
+}
+
+async function syncQuestions(
+  db: SupabaseClient,
+  sellerId: string,
+  supplierId: string,
+  headers: Record<string, string>,
+): Promise<{ synced: number; errors: string[] }> {
+  const errors: string[] = [];
+  let synced = 0;
+  let page = 0;
+  const size = 100;
+
+  while (true) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    const url = `${TY_BASE}/suppliers/${supplierId}/questions?${params}`;
+    let res: Response;
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch (e) {
+      errors.push(`Soru sayfa ${page} isteği başarısız: ${e}`);
+      break;
+    }
+    if (!res.ok) { errors.push(`Soru API hatası: ${res.status} ${res.statusText}`); break; }
+
+    const body = await res.json() as { content: TyQuestion[]; totalPages: number };
+    const items = body.content ?? [];
+    if (items.length === 0) break;
+
+    const rows = items.map((q) => {
+      const qId = String(q.id ?? q.questionId ?? "");
+      const qText = q.text ?? q.questionText ?? q.publicQuestion ?? q.question ?? "";
+      const status = String(q.status ?? "").toUpperCase();
+      const isAnswered = status === "ANSWERED" || (Array.isArray(q.answers) && q.answers.length > 0);
+      return {
+        seller_id:               sellerId,
+        marketplace:             "trendyol",
+        marketplace_question_id: qId,
+        product_id:              String(q.productId ?? q.productContentId ?? ""),
+        product_name:            q.productName ?? q.productModelName ?? "",
+        question:                qText,
+        is_answered:             isAnswered,
+        asked_at:                parseTyDate(q.createdDate ?? q.askDate),
+      };
+    });
+
+    const { error } = await db.from("questions")
+      .upsert(rows, { onConflict: "seller_id,marketplace,marketplace_question_id", ignoreDuplicates: false });
+    if (error) errors.push(`Soru kaydetme hatası: ${error.message}`);
+    else synced += rows.length;
+
+    if (page >= (body.totalPages ?? 1) - 1 || items.length < size) break;
+    page++;
+  }
+
+  return { synced, errors };
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -268,21 +436,27 @@ export async function POST(req: NextRequest) {
 
   const headers = tyHeaders(apiKey, apiSecret, supplierId);
 
-  const [productResult, orderResult] = await Promise.all([
+  const [productResult, orderResult, reviewResult, questionResult] = await Promise.all([
     syncProducts(db, user.id, supplierId, headers),
     syncOrders(db, user.id, supplierId, headers),
+    syncReviews(db, user.id, supplierId, headers),
+    syncQuestions(db, user.id, supplierId, headers),
   ]);
 
-  // Son senkronizasyon zamanını güncelle
   await db.from("sellers").update({ last_synced_at: new Date().toISOString() }).eq("id", user.id);
 
-  const allErrors = [...productResult.errors, ...orderResult.errors];
+  const allErrors = [
+    ...productResult.errors, ...orderResult.errors,
+    ...reviewResult.errors, ...questionResult.errors,
+  ];
 
   return NextResponse.json({
-    ok: allErrors.length === 0,
-    products: productResult.synced,
-    orders:   orderResult.synced,
-    errors:   allErrors,
-    syncedAt: new Date().toISOString(),
+    ok:        allErrors.length === 0,
+    products:  productResult.synced,
+    orders:    orderResult.synced,
+    reviews:   reviewResult.synced,
+    questions: questionResult.synced,
+    errors:    allErrors,
+    syncedAt:  new Date().toISOString(),
   });
 }
