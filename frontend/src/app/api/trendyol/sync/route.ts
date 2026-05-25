@@ -1,8 +1,7 @@
 /**
- * POST /api/trendyol/sync
- *
- * Pulls products and recent orders from Trendyol API, upserts to Supabase.
- * Returns { products, orders, errors[] }.
+ * POST /api/trendyol/sync  — kullanıcı tetiklemeli (session auth)
+ * GET  /api/trendyol/sync  — Vercel Cron (Authorization: Bearer CRON_SECRET)
+ *                            Tüm bağlı satıcıları sırayla senkronize eder.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient, SupabaseClient } from "@supabase/supabase-js";
@@ -551,4 +550,75 @@ export async function POST(req: NextRequest) {
     errors:    allErrors,
     syncedAt:  new Date().toISOString(),
   });
+}
+
+// ── Cron handler (GET) ────────────────────────────────────────────────────────
+
+export async function GET(req: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || req.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const db = createServiceClient(SUPABASE_URL, SERVICE_ROLE);
+
+  const { data: creds } = await db
+    .from("marketplace_credentials")
+    .select("seller_id, api_key, api_secret, supplier_id, store_id")
+    .eq("marketplace", "trendyol");
+
+  if (!creds || creds.length === 0) {
+    return NextResponse.json({ ok: true, sellers: 0, results: [] });
+  }
+
+  const results: Array<{
+    seller_id: string;
+    products?: number; orders?: number; reviews?: number;
+    questions?: number; returns?: number;
+    errors?: string[]; skipped?: string;
+  }> = [];
+
+  for (const cred of creds) {
+    let apiKey: string, apiSecret: string;
+    try {
+      apiKey    = decrypt(cred.api_key);
+      apiSecret = decrypt(cred.api_secret);
+    } catch {
+      results.push({ seller_id: cred.seller_id, skipped: "decrypt_error" });
+      continue;
+    }
+
+    const supplierId = cred.supplier_id || cred.store_id || "";
+    if (!apiKey || !apiSecret || !supplierId) {
+      results.push({ seller_id: cred.seller_id, skipped: "missing_credentials" });
+      continue;
+    }
+
+    const headers = tyHeaders(apiKey, apiSecret, supplierId);
+
+    try {
+      const [p, o, r, q, ret] = await Promise.all([
+        syncProducts(db, cred.seller_id, supplierId, headers),
+        syncOrders(db, cred.seller_id, supplierId, headers),
+        syncReviews(db, cred.seller_id, supplierId, headers),
+        syncQuestions(db, cred.seller_id, supplierId, headers),
+        syncReturns(db, cred.seller_id, supplierId, headers),
+      ]);
+
+      await db.from("sellers")
+        .update({ last_synced_at: new Date().toISOString() })
+        .eq("id", cred.seller_id);
+
+      results.push({
+        seller_id: cred.seller_id,
+        products:  p.synced, orders: o.synced,
+        reviews:   r.synced, questions: q.synced, returns: ret.synced,
+        errors:    [...p.errors, ...o.errors, ...r.errors, ...q.errors, ...ret.errors],
+      });
+    } catch (e) {
+      results.push({ seller_id: cred.seller_id, skipped: String(e) });
+    }
+  }
+
+  return NextResponse.json({ ok: true, sellers: results.length, results });
 }
