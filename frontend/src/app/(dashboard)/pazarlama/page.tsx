@@ -81,6 +81,123 @@ function generateCode(length = 8) {
   return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
 }
 
+const WA_TEMPLATES = [
+  {
+    label: "Müşteri Formu Linki",
+    emoji: "📋",
+    desc: "Sipariş sonrası geri bildirim formu gönder",
+    buildMsg: (shopName: string, formUrl: string) =>
+      `Merhaba! ${shopName} olarak siparişiniz için teşekkür ederiz 🌸\n\nDeneyiminizi değerlendirmek ister misiniz?\n👉 ${formUrl}\n\nGörüşleriniz bizim için çok değerli!`,
+  },
+  {
+    label: "Teşekkür + İndirim",
+    emoji: "🎁",
+    desc: "Olumlu yorum bırakan müşteriye özel indirim",
+    buildMsg: (shopName: string, code: string) =>
+      `Merhaba! Değerli yorumunuz için çok teşekkür ederiz 💛\n\n${shopName} olarak size özel %10 indirim kodunuz:\n🏷️ ${code || "TESEKKUR10"}\n\nBir sonraki alışverişinizde kullanabilirsiniz!`,
+  },
+  {
+    label: "Sipariş Kargo Bildirimi",
+    emoji: "📦",
+    desc: "Siparişin kargoya verildiğini bildir",
+    buildMsg: (shopName: string, orderNo: string) =>
+      `Merhaba! ${shopName} siparişiniz kargoya verildi 🚀\n\nSipariş No: ${orderNo || "#12345"}\n\nHerhangi bir sorunuz olursa bize yazabilirsiniz. İyi günler!`,
+  },
+  {
+    label: "İade Kolaylaştırma",
+    emoji: "🔄",
+    desc: "İade sürecini başlatmak için müşteriyi yönlendir",
+    buildMsg: (shopName: string) =>
+      `Merhaba! ${shopName} olarak iade talebinizi aldık.\n\nİade sürecinizi hızlandırmak için ürünü orijinal ambalajında kargo şubesine teslim edebilirsiniz.\n\nSorularınız için buradayız 💛`,
+  },
+];
+
+function WhatsAppTemplates() {
+  const [shopName, setShopName] = useState("");
+  const [extra, setExtra] = useState("");
+  const [selected, setSelected] = useState(0);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setShopName(user.user_metadata?.shop_name ?? "Mağazanız");
+    });
+  }, []);
+
+  const tpl = WA_TEMPLATES[selected];
+  const message = tpl.buildMsg(shopName, extra);
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+
+  function copy() {
+    navigator.clipboard.writeText(message);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-bold text-gray-900">WhatsApp Mesaj Şablonları</h3>
+        <p className="text-sm text-gray-500 mt-1">Müşterilerine tek tıkla hazır mesaj gönder</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {WA_TEMPLATES.map((t, i) => (
+          <button
+            key={i}
+            onClick={() => { setSelected(i); setExtra(""); }}
+            className={`text-left p-4 rounded-xl border transition-all ${selected === i ? "border-green-400 bg-green-50" : "border-gray-200 bg-white hover:border-gray-300"}`}
+          >
+            <span className="text-xl">{t.emoji}</span>
+            <p className={`text-sm font-semibold mt-1 ${selected === i ? "text-green-800" : "text-gray-900"}`}>{t.label}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
+        <div>
+          <label className="text-xs font-medium text-gray-700 block mb-1">
+            {selected === 0 ? "Form linki" : selected === 1 ? "İndirim kodu" : selected === 2 ? "Sipariş numarası" : "Ek bilgi (isteğe bağlı)"}
+          </label>
+          <input
+            type="text"
+            value={extra}
+            onChange={(e) => setExtra(e.target.value)}
+            placeholder={selected === 0 ? "https://saticipilot.com/f/magaza-adi" : selected === 1 ? "TESEKKUR10" : selected === 2 ? "#12345" : ""}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
+          />
+        </div>
+
+        <div className="bg-gray-50 rounded-xl p-4">
+          <p className="text-xs text-gray-500 font-medium mb-2">Önizleme</p>
+          <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{message}</p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={copy}
+            className="flex items-center gap-2 border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            <Copy className="w-4 h-4" />
+            {copied ? "Kopyalandı!" : "Kopyala"}
+          </button>
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors"
+          >
+            <Smartphone className="w-4 h-4" />
+            WhatsApp'ta Aç
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PazarlamaPage() {
   const [plan, setPlan] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -360,7 +477,7 @@ export default function PazarlamaPage() {
           { key: "kampanya", label: "Kampanyalar", icon: Megaphone },
           { key: "email", label: "E-posta", icon: Mail },
           { key: "gorsel", label: "Görsel AI", icon: Image },
-          { key: "sms", label: "SMS", icon: Smartphone },
+          { key: "sms", label: "WhatsApp", icon: Smartphone },
           { key: "otomasyon", label: "Otomasyonlar", icon: Zap },
           { key: "performans", label: "Performans", icon: BarChart2 },
         ].map(({ key, label, icon: Icon }) => (
@@ -749,18 +866,8 @@ export default function PazarlamaPage() {
         </div>
       )}
 
-      {/* ── SMS Tab ── */}
-      {tab === "sms" && (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Smartphone className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">SMS Kampanyası Yakında</h3>
-          <p className="text-sm text-gray-500 max-w-sm">
-            Müşterilerine doğrudan SMS ile ulaş. Bu özellik yakında aktif olacak.
-          </p>
-        </div>
-      )}
+      {/* ── WhatsApp Tab (eski SMS) ── */}
+      {tab === "sms" && <WhatsAppTemplates />}
 
       {/* ── Performans Tab ── */}
       {tab === "performans" && (() => {

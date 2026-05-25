@@ -3,11 +3,22 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  AlertTriangle, CheckCircle, MessageSquare, Clock, Filter,
+  AlertTriangle, CheckCircle, MessageSquare, Clock,
   Sparkles, Loader2, Copy, Upload, X, Download, FileText,
+  ThumbsUp, ThumbsDown, Minus, BarChart2,
 } from "lucide-react";
+
+interface AnalysisResult {
+  totalAnalyzed: number;
+  sentiment: { positive: number; neutral: number; negative: number };
+  complaints: { topic: string; count: number; example: string }[];
+  praises:    { topic: string; count: number; example: string }[];
+  recommendations: string[];
+  summary: string;
+}
 import { clsx } from "clsx";
 import { ReviewSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 
 interface Review {
   id: string;
@@ -45,6 +56,69 @@ const filters: { key: FilterType; label: string }[] = [
   { key: "bekleyen",   label: "Bekleyen" },
   { key: "cevaplandi", label: "Cevaplandı" },
 ];
+
+// ── Yanıt Şablonları ─────────────────────────────────────────────────────────
+interface ReplyTemplate { label: string; icon: string; text: string }
+
+const REPLY_TEMPLATES: ReplyTemplate[] = [
+  {
+    label: "Teşekkür (5★)",
+    icon: "⭐",
+    text: "Değerli yorumunuz için çok teşekkür ederiz! Memnuniyetiniz bizim için en büyük motivasyon. Yeni koleksiyonlarımızı takip etmeyi unutmayın. İyi günler dileriz! 🌸",
+  },
+  {
+    label: "Beden Sorunu",
+    icon: "📏",
+    text: "Yaşadığınız beden uyumsuzluğu için üzgünüz. Ürün sayfamızdaki ölçü tablosunu güncelledik; bir sonraki alışverişinizde daha doğru seçim yapabilmeniz için boyutları karşılaştırmanızı öneririz. İade sürecinizde yardımcı olmaktan memnuniyet duyarız.",
+  },
+  {
+    label: "Renk Farkı",
+    icon: "🎨",
+    text: "Ekrandaki renk kalibrasyonu nedeniyle oluşan renk algı farkı için özür dileriz. Fotoğraflarımızı daha doğal ışık koşullarında yenilemeye çalışıyoruz. Ürünü beğenmediyseniz iade işleminizde size yardımcı oluruz.",
+  },
+  {
+    label: "Kalite Şikayeti",
+    icon: "🔍",
+    text: "Yaşadığınız sorun için özür dileriz; bu beklentilerin altında bir deneyim için üzgünüz. Geri bildiriminizi tedarikçimizle paylaşacağız. Lütfen müşteri hizmetlerimizle iletişime geçin, en kısa sürede çözüm üretelim.",
+  },
+  {
+    label: "Genel Olumlu",
+    icon: "✨",
+    text: "Güzel yorumunuz için teşekkür ederiz! Ürünlerimizi ve hizmetimizi sürekli geliştirmek için çalışıyoruz. Tekrar görüşmek üzere, iyi günler! 😊",
+  },
+];
+
+function TemplateMenu({ onSelect }: { onSelect: (text: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1"
+      >
+        <span>📋</span> Şablonlar
+        <svg className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <div className="absolute left-0 bottom-full mb-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-64 py-1 overflow-hidden">
+          {REPLY_TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.label}
+              type="button"
+              onClick={() => { onSelect(tpl.text); setOpen(false); }}
+              className="w-full text-left px-4 py-2.5 hover:bg-orange-50 transition-colors flex items-center gap-2.5"
+            >
+              <span className="text-base">{tpl.icon}</span>
+              <span className="text-sm text-gray-700 font-medium">{tpl.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 const SAMPLE_CSV = `Ürün Adı,Puan,Yorum,Müşteri Adı,Tarih
 "Pembe Floral Bluz S/M Beden",5,"Harika ürün tam beden geldi çok memnun kaldım teşekkürler",Ayşe K.,2024-03-01
@@ -121,12 +195,18 @@ function downloadSampleCSV() {
 }
 
 export default function YorumlarPage() {
+  const { toast } = useToast();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>("tumu");
   const [drafting, setDrafting] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [editingReply, setEditingReply] = useState<Record<string, string>>({});
+
+  // Analiz state
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
 
   // CSV import state
   const [showImport, setShowImport] = useState(false);
@@ -155,10 +235,33 @@ export default function YorumlarPage() {
     setLoading(false);
   }
 
+  async function runAnalysis() {
+    if (reviews.length === 0) return;
+    setAnalysisLoading(true);
+    try {
+      const res = await fetch("/api/ai/review-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reviews: reviews.map((r) => ({
+            rating: r.rating,
+            comment: r.comment,
+            product_name: r.product_name,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!data.error) setAnalysis(data as AnalysisResult);
+    } finally {
+      setAnalysisLoading(false);
+    }
+  }
+
   async function markReplied(id: string) {
     const supabase = createClient();
     await supabase.from("reviews").update({ is_replied: true }).eq("id", id);
     setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, is_replied: true } : r)));
+    toast("Yorum cevaplandı olarak işaretlendi");
   }
 
   async function draftReply(r: Review) {
@@ -194,6 +297,7 @@ export default function YorumlarPage() {
   async function copyToClipboard(id: string, text: string) {
     await navigator.clipboard.writeText(text);
     setCopied(id);
+    toast("Cevap panoya kopyalandı");
     setTimeout(() => setCopied(null), 2000);
   }
 
@@ -274,6 +378,18 @@ export default function YorumlarPage() {
             <Clock className="w-4 h-4" /> {counts.bekleyen} bekliyor
           </span>
           <button
+            onClick={() => { setShowAnalysis(!showAnalysis); if (!analysis && !showAnalysis) runAnalysis(); }}
+            className={clsx(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
+              showAnalysis
+                ? "bg-orange-500 text-white"
+                : "border border-orange-200 text-orange-600 hover:bg-orange-50"
+            )}
+          >
+            <BarChart2 className="w-4 h-4" />
+            {showAnalysis ? "Yorumlara Dön" : "AI Analizi"}
+          </button>
+          <button
             onClick={() => setShowImport(true)}
             className="flex items-center gap-1.5 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
           >
@@ -282,6 +398,126 @@ export default function YorumlarPage() {
         </div>
       </div>
 
+      {/* ── AI Analiz Paneli ── */}
+      {showAnalysis && (
+        <div className="space-y-4">
+          {analysisLoading ? (
+            <div className="bg-white border border-gray-200 rounded-2xl p-10 flex flex-col items-center gap-3">
+              <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
+              <p className="text-sm text-gray-500">Yorumlar analiz ediliyor…</p>
+            </div>
+          ) : analysis ? (
+            <>
+              {/* Özet */}
+              <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-orange-500" />
+                  <p className="text-sm font-semibold text-gray-900">AI Yorum Özeti</p>
+                  <span className="text-xs text-gray-400 ml-auto">{analysis.totalAnalyzed} yorum analiz edildi</span>
+                </div>
+                <p className="text-sm text-gray-700 leading-relaxed">{analysis.summary}</p>
+
+                {/* Duygu dağılımı */}
+                <div className="grid grid-cols-3 gap-3 mt-4">
+                  {[
+                    { label: "Olumlu", count: analysis.sentiment.positive, icon: ThumbsUp, color: "text-green-600", bg: "bg-green-50", bar: "bg-green-500" },
+                    { label: "Nötr",   count: analysis.sentiment.neutral,  icon: Minus,    color: "text-gray-600",  bg: "bg-gray-50",  bar: "bg-gray-400" },
+                    { label: "Olumsuz",count: analysis.sentiment.negative, icon: ThumbsDown,color:"text-red-600",   bg: "bg-red-50",   bar: "bg-red-500"  },
+                  ].map(({ label, count, icon: Icon, color, bg, bar }) => {
+                    const total = analysis.sentiment.positive + analysis.sentiment.neutral + analysis.sentiment.negative;
+                    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                    return (
+                      <div key={label} className={`${bg} rounded-xl p-3 text-center`}>
+                        <Icon className={`w-4 h-4 ${color} mx-auto mb-1`} />
+                        <p className={`text-xl font-bold ${color}`}>{pct}%</p>
+                        <p className="text-xs text-gray-500">{label}</p>
+                        <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
+                          <div className={`h-full ${bar} rounded-full`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Şikayetler & Övgüler */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white border border-red-100 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ThumbsDown className="w-4 h-4 text-red-500" />
+                    <p className="text-sm font-semibold text-gray-900">Sık Şikayetler</p>
+                  </div>
+                  {analysis.complaints.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">Belirgin şikayet tespit edilmedi.</p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {analysis.complaints.map((c, i) => (
+                        <div key={i}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-sm font-medium text-gray-800">{c.topic}</span>
+                            <span className="text-xs font-bold text-red-600">{c.count}x</span>
+                          </div>
+                          <p className="text-xs text-gray-400 italic">"{c.example}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white border border-green-100 rounded-2xl p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <ThumbsUp className="w-4 h-4 text-green-500" />
+                    <p className="text-sm font-semibold text-gray-900">Sık Övgüler</p>
+                  </div>
+                  {analysis.praises.length === 0 ? (
+                    <p className="text-xs text-gray-400 py-2">Belirgin övgü tespit edilmedi.</p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {analysis.praises.map((p, i) => (
+                        <div key={i}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="text-sm font-medium text-gray-800">{p.topic}</span>
+                            <span className="text-xs font-bold text-green-600">{p.count}x</span>
+                          </div>
+                          <p className="text-xs text-gray-400 italic">"{p.example}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Öneriler */}
+              <div className="bg-white border border-blue-100 rounded-2xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-blue-500" />
+                  <p className="text-sm font-semibold text-gray-900">AI Aksiyon Önerileri</p>
+                </div>
+                <ul className="space-y-2">
+                  {analysis.recommendations.map((rec, i) => (
+                    <li key={i} className="flex items-start gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+                      <p className="text-sm text-gray-700">{rec}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <button
+                onClick={runAnalysis}
+                disabled={analysisLoading}
+                className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-orange-600 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Analizi yenile
+              </button>
+            </>
+          ) : null}
+        </div>
+      )}
+
+      {/* ── Normal liste ── */}
+      {!showAnalysis && <>
       <div className="flex flex-wrap gap-1 bg-gray-100 p-1 rounded-lg w-fit">
         {filters.map(({ key, label }) => (
           <button
@@ -325,7 +561,7 @@ export default function YorumlarPage() {
             </>
           ) : (
             <>
-              <Filter className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+              <MessageSquare className="w-8 h-8 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">Bu filtrede yorum yok.</p>
             </>
           )}
@@ -379,7 +615,7 @@ export default function YorumlarPage() {
                     rows={3}
                     className="w-full text-sm text-orange-900 leading-relaxed bg-white border border-orange-200 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300"
                   />
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-2 flex-wrap items-center">
                     <button
                       onClick={() => markReplied(r.id)}
                       className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-colors"
@@ -401,6 +637,12 @@ export default function YorumlarPage() {
                       {drafting === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                       Yeniden Oluştur
                     </button>
+                    <TemplateMenu
+                      onSelect={(text) => {
+                        setEditingReply((prev) => ({ ...prev, [r.id]: text }));
+                        toast("Şablon uygulandı — düzenleyebilirsin", "info");
+                      }}
+                    />
                   </div>
                 </div>
               )}
@@ -525,6 +767,7 @@ export default function YorumlarPage() {
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 }

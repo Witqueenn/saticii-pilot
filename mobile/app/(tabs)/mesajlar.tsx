@@ -32,6 +32,17 @@ interface Message {
   product_name?: string;
 }
 
+interface Question {
+  id: string;
+  product_name: string | null;
+  question: string;
+  suggested_answer: string | null;
+  is_answered: boolean;
+  asked_at: string;
+}
+
+type TabType = "mesajlar" | "sorular";
+
 const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }> = {
   okunmadi: { label: "Yeni", color: "#dc2626", bg: "#fee2e2" },
   okundu: { label: "Okundu", color: "#d97706", bg: "#fef3c7" },
@@ -54,6 +65,9 @@ const QUICK_REPLIES = [
 
 export default function MesajlarScreen() {
   const t = useTheme();
+  const [activeTab, setActiveTab] = useState<TabType>("mesajlar");
+
+  // Messages state
   const [messages, setMessages] = useState<Message[]>([]);
   const [filtered, setFiltered] = useState<Message[]>([]);
   const [filter, setFilter] = useState("all");
@@ -62,6 +76,15 @@ export default function MesajlarScreen() {
   const [selected, setSelected] = useState<Message | null>(null);
   const [reply, setReply] = useState("");
   const [replying, setReplying] = useState(false);
+
+  // Questions state
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [qFilter, setQFilter] = useState<"all" | "bekleyen" | "cevaplandi">("all");
+  const [qLoading, setQLoading] = useState(true);
+  const [qRefreshing, setQRefreshing] = useState(false);
+  const [selectedQ, setSelectedQ] = useState<Question | null>(null);
+  const [draftingQ, setDraftingQ] = useState(false);
+  const [apiUrl] = useState(process.env.EXPO_PUBLIC_API_URL ?? "");
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -75,7 +98,19 @@ export default function MesajlarScreen() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  async function loadQuestions() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("questions")
+      .select("id, product_name, question, suggested_answer, is_answered, asked_at")
+      .eq("seller_id", user.id)
+      .order("asked_at", { ascending: false });
+    setQuestions(data ?? []);
+    setQLoading(false);
+  }
+
+  useEffect(() => { load(); loadQuestions(); }, []);
 
   useEffect(() => {
     setFiltered(filter === "all" ? messages : messages.filter((m) => m.status === filter));
@@ -86,6 +121,56 @@ export default function MesajlarScreen() {
     await load();
     setRefreshing(false);
   }
+
+  async function onQRefresh() {
+    setQRefreshing(true);
+    await loadQuestions();
+    setQRefreshing(false);
+  }
+
+  async function draftAnswer(q: Question) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    setDraftingQ(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/ai/draft-answer`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          question_id: q.id,
+          product_name: q.product_name ?? "Ürün",
+          question: q.question,
+        }),
+      });
+      const data = await res.json();
+      if (data.answer) {
+        setQuestions((prev) =>
+          prev.map((item) => item.id === q.id ? { ...item, suggested_answer: data.answer } : item)
+        );
+        setSelectedQ((prev) => prev?.id === q.id ? { ...prev, suggested_answer: data.answer } : prev);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } finally {
+      setDraftingQ(false);
+    }
+  }
+
+  async function markQAnswered(id: string) {
+    await supabase.from("questions").update({ is_answered: true }).eq("id", id);
+    setQuestions((prev) => prev.map((q) => q.id === id ? { ...q, is_answered: true } : q));
+    setSelectedQ((prev) => prev?.id === id ? { ...prev, is_answered: true } : prev);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  const filteredQuestions = questions.filter((q) => {
+    if (qFilter === "bekleyen") return !q.is_answered;
+    if (qFilter === "cevaplandi") return q.is_answered;
+    return true;
+  });
+  const pendingQCount = questions.filter((q) => !q.is_answered).length;
 
   async function openMessage(m: Message) {
     Haptics.selectionAsync();
@@ -109,7 +194,7 @@ export default function MesajlarScreen() {
 
   const unread = messages.filter((m) => m.status === "okunmadi").length;
 
-  if (loading) {
+  if (loading && qLoading) {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]} edges={["top"]}>
         <View style={[styles.header, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
@@ -126,14 +211,99 @@ export default function MesajlarScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: t.bg }]} edges={["top"]}>
       <View style={[styles.header, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
         <View>
-          <Text style={[styles.title, { color: t.text }]}>Mesajlar</Text>
-          {unread > 0 && <Text style={styles.unreadText}>{unread} yeni mesaj</Text>}
+          <Text style={[styles.title, { color: t.text }]}>
+            {activeTab === "mesajlar" ? "Mesajlar" : "Müşteri Soruları"}
+          </Text>
+          {activeTab === "mesajlar" && unread > 0 && (
+            <Text style={styles.unreadText}>{unread} yeni mesaj</Text>
+          )}
+          {activeTab === "sorular" && pendingQCount > 0 && (
+            <Text style={styles.unreadText}>{pendingQCount} bekleyen soru</Text>
+          )}
         </View>
         <View style={[styles.countBadge, { backgroundColor: t.input }]}>
-          <Text style={[styles.countText, { color: t.textSub }]}>{filtered.length}</Text>
+          <Text style={[styles.countText, { color: t.textSub }]}>
+            {activeTab === "mesajlar" ? filtered.length : filteredQuestions.length}
+          </Text>
         </View>
       </View>
 
+      {/* Tab switcher */}
+      <View style={[styles.tabBar, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === "mesajlar" && { borderBottomColor: t.orange, borderBottomWidth: 2 }]}
+          onPress={() => { Haptics.selectionAsync(); setActiveTab("mesajlar"); }}
+        >
+          <Text style={[styles.tabText, { color: activeTab === "mesajlar" ? t.orange : t.textSub }]}>Mesajlar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === "sorular" && { borderBottomColor: t.orange, borderBottomWidth: 2 }]}
+          onPress={() => { Haptics.selectionAsync(); setActiveTab("sorular"); }}
+        >
+          <Text style={[styles.tabText, { color: activeTab === "sorular" ? t.orange : t.textSub }]}>
+            Sorular{pendingQCount > 0 ? ` (${pendingQCount})` : ""}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Questions tab */}
+      {activeTab === "sorular" && (
+        <>
+          <View style={[styles.filters, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
+            {(["all", "bekleyen", "cevaplandi"] as const).map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterBtn, { backgroundColor: t.input }, qFilter === f && { backgroundColor: t.orange }]}
+                onPress={() => { Haptics.selectionAsync(); setQFilter(f); }}
+              >
+                <Text style={[styles.filterText, { color: t.textSub }, qFilter === f && { color: "#fff", fontWeight: "700" }]}>
+                  {f === "all" ? "Tümü" : f === "bekleyen" ? "Bekleyen" : "Cevaplandı"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <FlatList
+            data={filteredQuestions}
+            keyExtractor={(q) => q.id}
+            contentContainerStyle={styles.list}
+            refreshControl={<RefreshControl refreshing={qRefreshing} onRefresh={onQRefresh} tintColor={t.orange} />}
+            renderItem={({ item: q }) => (
+              <TouchableOpacity
+                style={[styles.card, { backgroundColor: t.card }, !q.is_answered && { borderLeftWidth: 3, borderLeftColor: t.orange }]}
+                onPress={() => { Haptics.selectionAsync(); setSelectedQ(q); }}
+                activeOpacity={0.75}
+              >
+                {q.product_name && (
+                  <View style={[styles.productTag, { backgroundColor: t.input }]}>
+                    <Text style={[styles.productTagText, { color: t.textMuted }]} numberOfLines={1}>{q.product_name}</Text>
+                  </View>
+                )}
+                <Text style={[styles.subject, { color: t.text }, !q.is_answered && { fontWeight: "700" }]} numberOfLines={2}>
+                  {q.question}
+                </Text>
+                <View style={styles.cardTop}>
+                  <Text style={[styles.msgDate, { color: t.textMuted }]}>
+                    {new Date(q.asked_at).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
+                  </Text>
+                  <View style={[styles.badge, { backgroundColor: q.is_answered ? "#d1fae5" : "#fff7ed" }]}>
+                    <Text style={[styles.badgeText, { color: q.is_answered ? "#059669" : "#ea580c" }]}>
+                      {q.is_answered ? "Cevaplandı" : "Bekliyor"}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={[styles.emptyText, { color: t.textMuted }]}>Soru bulunamadı</Text>
+              </View>
+            }
+          />
+        </>
+      )}
+
+      {/* Messages tab */}
+      {activeTab === "mesajlar" && <>
       <View style={[styles.filters, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
         {FILTERS.map((f) => (
           <TouchableOpacity
@@ -300,6 +470,80 @@ export default function MesajlarScreen() {
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
+      </>}
+
+      {/* Question Detail Modal */}
+      <Modal visible={!!selectedQ} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelectedQ(null)}>
+        <SafeAreaView style={[styles.modalSafe, { backgroundColor: t.card }]} edges={["top"]}>
+          <View style={[styles.modalHeader, { borderBottomColor: t.border }]}>
+            <TouchableOpacity onPress={() => setSelectedQ(null)} style={[styles.modalClose, { backgroundColor: t.input }]}>
+              <Ionicons name="close" size={22} color={t.textSub} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: t.text }]}>Müşteri Sorusu</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          {selectedQ && (
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+              {selectedQ.product_name && (
+                <View style={[styles.productTagLarge, { backgroundColor: t.input }]}>
+                  <Ionicons name="pricetag-outline" size={13} color={t.textSub} />
+                  <Text style={[styles.productTagLargeText, { color: t.textSub }]}>{selectedQ.product_name}</Text>
+                </View>
+              )}
+
+              <View style={[styles.bodyBox, { backgroundColor: t.bg }]}>
+                <Text style={[styles.bodyText, { color: t.text }]}>{selectedQ.question}</Text>
+              </View>
+
+              <Text style={[styles.msgDateLarge, { color: t.textMuted }]}>
+                {new Date(selectedQ.asked_at).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+              </Text>
+
+              {!selectedQ.is_answered && (
+                <TouchableOpacity
+                  style={[styles.replyBtn, { backgroundColor: "#f97316", marginBottom: 12 }, draftingQ && styles.replyBtnDisabled]}
+                  onPress={() => draftAnswer(selectedQ)}
+                  disabled={draftingQ}
+                >
+                  {draftingQ
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <>
+                        <Ionicons name="sparkles" size={16} color="#fff" />
+                        <Text style={styles.replyBtnText}>AI ile Cevap Taslağı Oluştur</Text>
+                      </>
+                  }
+                </TouchableOpacity>
+              )}
+
+              {selectedQ.suggested_answer && (
+                <View style={[styles.prevReply, { backgroundColor: "#fef3c7" }]}>
+                  <View style={styles.prevReplyHeader}>
+                    <Ionicons name="sparkles" size={13} color="#d97706" />
+                    <Text style={[styles.prevReplyLabel, { color: "#d97706" }]}>AI Taslağı — Trendyol&apos;a kopyalayıp yapıştır</Text>
+                  </View>
+                  <Text style={[styles.prevReplyText, { color: "#374151" }]}>{selectedQ.suggested_answer}</Text>
+                </View>
+              )}
+
+              {!selectedQ.is_answered && (
+                <TouchableOpacity
+                  style={[styles.replyBtn, { backgroundColor: "#059669" }]}
+                  onPress={() => markQAnswered(selectedQ.id)}
+                >
+                  <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                  <Text style={styles.replyBtnText}>Cevaplandı Olarak İşaretle</Text>
+                </TouchableOpacity>
+              )}
+              {selectedQ.is_answered && (
+                <View style={[styles.badge, { backgroundColor: "#d1fae5", alignSelf: "flex-start" }]}>
+                  <Text style={[styles.badgeText, { color: "#059669" }]}>✓ Cevaplandı</Text>
+                </View>
+              )}
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -311,6 +555,9 @@ const styles = StyleSheet.create({
   unreadText: { fontSize: 12, color: "#f97316", fontWeight: "600", marginTop: 2 },
   countBadge: { borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4 },
   countText: { fontSize: 13, fontWeight: "600" },
+  tabBar: { flexDirection: "row", borderBottomWidth: 1 },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: "center" },
+  tabText: { fontSize: 14, fontWeight: "600" },
   filters: { flexDirection: "row", gap: 8, padding: 12, borderBottomWidth: 1 },
   filterBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   filterText: { fontSize: 12, fontWeight: "500" },

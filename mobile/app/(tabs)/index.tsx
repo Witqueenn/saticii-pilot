@@ -7,6 +7,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   RefreshControl,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -83,10 +87,35 @@ export default function DashboardScreen() {
   const [pendingReturns, setPendingReturns] = useState(0);
   const [unreplied, setUnreplied] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [healthScore, setHealthScore] = useState<number | null>(null);
+  const [briefItems, setBriefItems] = useState<string[]>([]);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [weeklyGoal, setWeeklyGoal] = useState<number | null>(null);
+  const [weekRevenue, setWeekRevenue] = useState(0);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [goalInputVal, setGoalInputVal] = useState("");
+  const [savingGoal, setSavingGoal] = useState(false);
   const { refresh: refreshBadges } = useBadges();
 
   useRealtimeReviews(sellerId, () => { load(); refreshBadges(); });
   useRealtimeReturns(sellerId, () => { load(); refreshBadges(); });
+
+  async function saveGoalMobile() {
+    const val = parseFloat(goalInputVal.replace(/\./g, "").replace(",", "."));
+    if (isNaN(val) || val <= 0) return;
+    setSavingGoal(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("sellers").upsert({ id: user.id, weekly_revenue_goal: val });
+        setWeeklyGoal(val);
+      }
+    } finally {
+      setSavingGoal(false);
+      setGoalModalOpen(false);
+      setGoalInputVal("");
+    }
+  }
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -95,21 +124,68 @@ export default function DashboardScreen() {
     setShopName(user.user_metadata?.shop_name ?? user.email?.split("@")[0] ?? "Mağaza");
     setSellerId(user.id);
 
-    const [reviewsRes, returnsRes] = await Promise.all([
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+
+    const [reviewsRes, returnsRes, productsRes, weekOrdersRes, sellerRes] = await Promise.all([
       supabase.from("reviews").select("id, rating, is_replied, is_urgent, created_at").eq("seller_id", user.id),
-      supabase.from("returns").select("id").eq("seller_id", user.id),
+      supabase.from("returns").select("id, returned_at").eq("seller_id", user.id),
+      supabase.from("products").select("description_score").eq("seller_id", user.id),
+      supabase.from("orders").select("id, total_price").eq("seller_id", user.id).gte("ordered_at", weekAgo),
+      supabase.from("sellers").select("weekly_revenue_goal").eq("id", user.id).single(),
     ]);
 
     const reviews = reviewsRes.data ?? [];
     const returns = returnsRes.data ?? [];
+    const products = productsRes.data ?? [];
+    const weekOrders = weekOrdersRes.data ?? [];
+    if (sellerRes.data?.weekly_revenue_goal) setWeeklyGoal(sellerRes.data.weekly_revenue_goal);
+    const wRevenue = weekOrders.reduce((s: number, o: { total_price: number | null }) => s + (o.total_price ?? 0), 0);
+    setWeekRevenue(wRevenue);
 
     const avgRating = reviews.length
       ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
       : "—";
     const returnsCount = returns.length;
     const unrepliedCount = reviews.filter((r: any) => !r.is_replied).length;
+    const urgentCount = reviews.filter((r: any) => r.is_urgent && !r.is_replied).length;
+    const lowScoreProducts = products.filter((p: any) => (p.description_score ?? 100) < 60).length;
+    const weekReturns = returns.filter((r: any) => r.returned_at >= weekAgo).length;
+
     setPendingReturns(returnsCount);
     setUnreplied(unrepliedCount);
+
+    // Sağlık skoru hesapla
+    const replyScore = reviews.length > 0
+      ? Math.round(((reviews.length - unrepliedCount) / reviews.length) * 30) : 30;
+    const urgentScore = Math.max(0, 25 - urgentCount * 5);
+    const productScore = products.length > 0
+      ? Math.round(((products.length - lowScoreProducts) / products.length) * 25) : 25;
+    let returnScore = 20;
+    if (weekOrders.length > 0) {
+      const rate = weekReturns / weekOrders.length;
+      returnScore = rate <= 0.05 ? 20 : rate <= 0.10 ? 15 : rate <= 0.20 ? 8 : 0;
+    }
+    setHealthScore(Math.min(100, replyScore + urgentScore + productScore + returnScore));
+
+    // AI Brief (async, non-blocking)
+    setBriefLoading(true);
+    fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/ai/daily-brief`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        urgentReviews: urgentCount,
+        pendingReviews: unrepliedCount,
+        pendingQuestions: 0,
+        weekReturns,
+        lowScoreProducts,
+        weekOrders: weekOrders.length,
+        weekRevenue: wRevenue,
+      }),
+    })
+      .then((r) => r.json())
+      .then((d) => { if (d.items) setBriefItems(d.items.slice(0, 3)); })
+      .catch(() => {})
+      .finally(() => setBriefLoading(false));
 
     setKpis([
       { label: "Toplam Yorum", value: reviews.length, color: "#3b82f6", bg: "#eff6ff", icon: "chatbubble", href: "/(tabs)/yorumlar" },
@@ -222,6 +298,88 @@ export default function DashboardScreen() {
           ))}
         </View>
 
+        {/* Sağlık Skoru */}
+        {healthScore !== null && (() => {
+          const sc = healthScore;
+          const color = sc >= 80 ? "#16a34a" : sc >= 60 ? "#ca8a04" : sc >= 40 ? "#ea580c" : "#dc2626";
+          const bg   = sc >= 80 ? "#f0fdf4"  : sc >= 60 ? "#fefce8"  : sc >= 40 ? "#fff7ed"  : "#fef2f2";
+          const lbl  = sc >= 80 ? "Mükemmel" : sc >= 60 ? "İyi"       : sc >= 40 ? "Orta"     : "Dikkat";
+          return (
+            <View style={[styles.scoreCard, { backgroundColor: bg, borderColor: color + "40" }]}>
+              <View style={styles.scoreLeft}>
+                <Text style={[styles.scoreNum, { color }]}>{sc}</Text>
+                <Text style={[styles.scoreMax, { color: color + "99" }]}>/100</Text>
+              </View>
+              <View style={styles.scoreMid} />
+              <View style={styles.scoreRight}>
+                <Text style={[styles.scoreTitle, { color: t.text }]}>Mağaza Sağlık Skoru</Text>
+                <View style={[styles.scoreBadge, { backgroundColor: color + "20" }]}>
+                  <Text style={[styles.scoreBadgeText, { color }]}>{lbl}</Text>
+                </View>
+                <View style={[styles.scoreBar, { backgroundColor: t.border }]}>
+                  <View style={[styles.scoreBarFill, { width: `${sc}%` as any, backgroundColor: color }]} />
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+
+        {/* Haftalık Hedef */}
+        {weeklyGoal === null && (
+          <TouchableOpacity
+            style={[styles.goalCTA, { backgroundColor: t.card, borderColor: t.borderStrong }]}
+            onPress={() => { setGoalInputVal(""); setGoalModalOpen(true); }}
+          >
+            <Ionicons name="flag-outline" size={16} color={t.orange} />
+            <Text style={[styles.goalCTAText, { color: t.text }]}>Haftalık gelir hedefi belirle</Text>
+            <Ionicons name="chevron-forward" size={14} color={t.textMuted} />
+          </TouchableOpacity>
+        )}
+
+        {weeklyGoal !== null && (() => {
+          const pct = Math.min(100, Math.round((weekRevenue / weeklyGoal) * 100));
+          const dow = new Date().getDay();
+          const daysIntoWeek = dow === 0 ? 7 : dow;
+          const weekPct = Math.round((daysIntoWeek / 7) * 100);
+          const isAhead = pct >= weekPct;
+          const isComplete = pct >= 100;
+          const color = isComplete ? "#16a34a" : isAhead ? "#16a34a" : "#ea580c";
+          const bg    = isComplete ? "#f0fdf4"  : isAhead ? "#f0fdf4"  : "#fff7ed";
+          const remaining = Math.max(0, weeklyGoal - weekRevenue);
+          return (
+            <View style={[styles.goalCard, { backgroundColor: bg, borderColor: color + "40" }]}>
+              <View style={styles.goalHeader}>
+                <Ionicons name="flag" size={14} color={color} />
+                <Text style={[styles.goalTitle, { color: t.text }]}>Haftalık Gelir Hedefi</Text>
+                <View style={[styles.goalBadge, { backgroundColor: color + "20" }]}>
+                  <Text style={[styles.goalBadgeText, { color }]}>%{pct}</Text>
+                </View>
+                <TouchableOpacity onPress={() => { setGoalInputVal(String(weeklyGoal ?? "")); setGoalModalOpen(true); }} hitSlop={8}>
+                  <Ionicons name="pencil-outline" size={14} color={t.textMuted} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.goalAmounts}>
+                <Text style={[styles.goalCurrent, { color }]}>
+                  {weekRevenue.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
+                </Text>
+                <Text style={[styles.goalTarget, { color: t.textMuted }]}>
+                  / {weeklyGoal.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
+                </Text>
+              </View>
+              <View style={[styles.goalBar, { backgroundColor: t.border }]}>
+                <View style={[styles.goalBarFill, { width: `${pct}%` as any, backgroundColor: color }]} />
+              </View>
+              <Text style={[styles.goalMsg, { color: t.textMuted }]}>
+                {isComplete
+                  ? "Tebrikler! Hedefinize ulaştınız 🎉"
+                  : isAhead
+                  ? `${remaining.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} ₺ kaldı, harika gidiyorsunuz!`
+                  : `Hedefin gerisinde. ${remaining.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} ₺ kaldı`}
+              </Text>
+            </View>
+          );
+        })()}
+
         {/* Urgency action strip */}
         {(unreplied > 0 || pendingReturns > 0) && (
           <View style={[styles.actionStrip, { backgroundColor: t.card, borderColor: t.borderStrong }]}>
@@ -285,6 +443,34 @@ export default function DashboardScreen() {
           </View>
         )}
 
+        {/* AI Günlük Brief */}
+        {(briefLoading || briefItems.length > 0) && (
+          <View style={[styles.briefCard, { backgroundColor: t.card, borderColor: t.borderStrong }]}>
+            <View style={styles.briefHeader}>
+              <Ionicons name="sparkles" size={16} color={t.orange} />
+              <Text style={[styles.briefTitle, { color: t.text }]}>AI Günlük Analizi</Text>
+              <View style={[styles.briefBadge, { backgroundColor: "#fff7ed" }]}>
+                <Text style={{ fontSize: 10, color: t.orange, fontWeight: "700" }}>Bugün için</Text>
+              </View>
+            </View>
+            {briefLoading ? (
+              <View style={styles.briefLoading}>
+                <Ionicons name="reload" size={14} color={t.textMuted} />
+                <Text style={[styles.briefLoadingText, { color: t.textMuted }]}>Analiz ediliyor…</Text>
+              </View>
+            ) : (
+              briefItems.map((item, i) => (
+                <View key={i} style={styles.briefItem}>
+                  <View style={[styles.briefNum, { backgroundColor: t.orange }]}>
+                    <Text style={styles.briefNumText}>{i + 1}</Text>
+                  </View>
+                  <Text style={[styles.briefText, { color: t.textSub }]}>{item}</Text>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+
         {/* Acil yorumlar */}
         {urgent.length > 0 ? (
           <View style={styles.section}>
@@ -318,6 +504,43 @@ export default function DashboardScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Hedef Düzenleme Modalı */}
+      <Modal visible={goalModalOpen} transparent animationType="fade" onRequestClose={() => setGoalModalOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setGoalModalOpen(false)} />
+          <View style={[styles.modalBox, { backgroundColor: t.card }]}>
+            <Text style={[styles.modalTitle, { color: t.text }]}>Haftalık Gelir Hedefi</Text>
+            <Text style={[styles.modalSub, { color: t.textMuted }]}>Bu haftaki ciro hedefinizi girin (₺)</Text>
+            <View style={[styles.modalInputRow, { backgroundColor: t.input, borderColor: t.border }]}>
+              <Text style={[styles.modalCurrency, { color: t.textMuted }]}>₺</Text>
+              <TextInput
+                style={[styles.modalInput, { color: t.text }]}
+                value={goalInputVal}
+                onChangeText={setGoalInputVal}
+                keyboardType="numeric"
+                placeholder="Örn: 10000"
+                placeholderTextColor={t.textMuted}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={saveGoalMobile}
+              />
+            </View>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={[styles.modalCancel, { borderColor: t.border }]} onPress={() => setGoalModalOpen(false)}>
+                <Text style={[styles.modalCancelText, { color: t.textSub }]}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSave, { backgroundColor: t.orange, opacity: savingGoal ? 0.6 : 1 }]}
+                onPress={saveGoalMobile}
+                disabled={savingGoal}
+              >
+                <Text style={styles.modalSaveText}>{savingGoal ? "Kaydediliyor…" : "Kaydet"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -368,4 +591,50 @@ const styles = StyleSheet.create({
   emptyIcon: { fontSize: 36, marginBottom: 4 },
   emptyTitle: { fontSize: 16, fontWeight: "700" },
   emptySubtitle: { fontSize: 13, textAlign: "center" },
+  scoreCard: { flexDirection: "row", alignItems: "center", gap: 16, borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1 },
+  scoreLeft: { alignItems: "center", width: 64 },
+  scoreNum: { fontSize: 40, fontWeight: "900", lineHeight: 44 },
+  scoreMax: { fontSize: 12, fontWeight: "600", marginTop: 2 },
+  scoreMid: { width: 1, alignSelf: "stretch", backgroundColor: "#e5e7eb" },
+  scoreRight: { flex: 1, gap: 6 },
+  scoreTitle: { fontSize: 13, fontWeight: "700" },
+  scoreBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  scoreBadgeText: { fontSize: 11, fontWeight: "700" },
+  scoreBar: { height: 6, borderRadius: 3, overflow: "hidden", marginTop: 2 },
+  scoreBarFill: { height: 6, borderRadius: 3 },
+  briefCard: { borderRadius: 14, padding: 16, marginBottom: 12, borderWidth: 1 },
+  briefHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
+  briefTitle: { fontSize: 14, fontWeight: "700", flex: 1 },
+  briefBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  briefLoading: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8 },
+  briefLoadingText: { fontSize: 13 },
+  briefItem: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 10 },
+  briefNum: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 },
+  briefNumText: { color: "#fff", fontSize: 10, fontWeight: "800" },
+  briefText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  goalCard: { borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1 },
+  goalHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  goalTitle: { fontSize: 13, fontWeight: "700", flex: 1 },
+  goalBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20 },
+  goalBadgeText: { fontSize: 11, fontWeight: "700" },
+  goalAmounts: { flexDirection: "row", alignItems: "baseline", gap: 4, marginBottom: 8 },
+  goalCurrent: { fontSize: 28, fontWeight: "900" },
+  goalTarget: { fontSize: 13, fontWeight: "500" },
+  goalBar: { height: 6, borderRadius: 3, overflow: "hidden", marginBottom: 6 },
+  goalBarFill: { height: 6, borderRadius: 3 },
+  goalMsg: { fontSize: 12, lineHeight: 17 },
+  goalCTA: { flexDirection: "row", alignItems: "center", gap: 10, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1 },
+  goalCTAText: { flex: 1, fontSize: 13, fontWeight: "600" },
+  modalOverlay: { flex: 1, justifyContent: "flex-end", paddingBottom: 32, paddingHorizontal: 16 },
+  modalBox: { borderRadius: 20, padding: 24, shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: -4 }, elevation: 10 },
+  modalTitle: { fontSize: 17, fontWeight: "800", marginBottom: 4 },
+  modalSub: { fontSize: 13, marginBottom: 18 },
+  modalInputRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, marginBottom: 20, height: 52 },
+  modalCurrency: { fontSize: 18, fontWeight: "700", marginRight: 6 },
+  modalInput: { flex: 1, fontSize: 20, fontWeight: "700" },
+  modalActions: { flexDirection: "row", gap: 10 },
+  modalCancel: { flex: 1, borderWidth: 1, borderRadius: 12, height: 48, alignItems: "center", justifyContent: "center" },
+  modalCancelText: { fontSize: 15, fontWeight: "600" },
+  modalSave: { flex: 2, borderRadius: 12, height: 48, alignItems: "center", justifyContent: "center" },
+  modalSaveText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });

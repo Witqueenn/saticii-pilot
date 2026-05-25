@@ -6,6 +6,7 @@ import {
   CheckCircle, ExternalLink, ChevronDown, ChevronUp,
   Trash2, Loader2, MessageSquare, Clock,
   RotateCcw, Package, Star, TrendingUp, ShoppingBag, Globe,
+  Wifi, WifiOff, RefreshCw, AlertCircle,
 } from "lucide-react";
 
 interface Field { key: string; label: string; placeholder: string; }
@@ -198,6 +199,16 @@ const PLATFORMS: { title: string; items: Platform[] }[] = [
   },
 ];
 
+function formatSyncTime(iso: string | null): string {
+  if (!iso) return "";
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return "az önce";
+  if (mins < 60) return `${mins} dk önce`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} sa önce`;
+  return new Date(iso).toLocaleDateString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 interface Credential { id: string; marketplace: string; }
 
 export default function BaglantiPage() {
@@ -207,7 +218,12 @@ export default function BaglantiPage() {
   const [values, setValues] = useState<Record<string, Record<string, string>>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<Record<string, { ok: boolean; message: string } | null>>({});
   const [userId, setUserId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ products: number; orders: number; errors: string[] } | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -216,10 +232,12 @@ export default function BaglantiPage() {
       if (!user) return;
       setUserId(user.id);
 
-      const [{ data: creds }, { data: ints }] = await Promise.all([
+      const [{ data: creds }, { data: ints }, { data: seller }] = await Promise.all([
         supabase.from("marketplace_credentials").select("id, marketplace").eq("seller_id", user.id),
         supabase.from("platform_interests").select("platform").eq("seller_id", user.id),
+        supabase.from("sellers").select("last_synced_at").eq("id", user.id).single(),
       ]);
+      if (seller?.last_synced_at) setLastSyncedAt(seller.last_synced_at);
       setConnected(creds ?? []);
       setInterests((ints ?? []).map((r: { platform: string }) => r.platform));
     }
@@ -272,6 +290,34 @@ export default function BaglantiPage() {
     });
     setConnected((prev) => prev.filter((c) => c.marketplace !== platformId));
     setDeleting(null);
+  }
+
+  async function handleTest(platformId: string) {
+    setTesting(platformId);
+    setTestResult((prev) => ({ ...prev, [platformId]: null }));
+    try {
+      const res = await fetch(`/api/${platformId}/test`, { method: "POST" });
+      const data = await res.json();
+      setTestResult((prev) => ({ ...prev, [platformId]: { ok: !!data.ok, message: data.message || data.error || "" } }));
+    } catch {
+      setTestResult((prev) => ({ ...prev, [platformId]: { ok: false, message: "Bağlantı hatası" } }));
+    }
+    setTesting(null);
+  }
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncResult(null);
+    try {
+      const res = await fetch("/api/trendyol/sync", { method: "POST" });
+      const data = await res.json();
+      setSyncResult({ products: data.products ?? 0, orders: data.orders ?? 0, errors: data.errors ?? [] });
+      if (data.syncedAt) setLastSyncedAt(data.syncedAt);
+    } catch {
+      setSyncResult({ products: 0, orders: 0, errors: ["Ağ hatası, tekrar deneyin"] });
+    } finally {
+      setSyncing(false);
+    }
   }
 
   async function handleInterest(platformId: string) {
@@ -343,6 +389,30 @@ export default function BaglantiPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {conn && p.id === "trendyol" && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleTest(p.id); }}
+                          disabled={testing === p.id}
+                          title={testResult[p.id]?.message || "Bağlantıyı test et"}
+                          className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-colors text-gray-500 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          {testing === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> :
+                           testResult[p.id]?.ok === true ? <Wifi className="w-3.5 h-3.5 text-green-500" /> :
+                           testResult[p.id]?.ok === false ? <WifiOff className="w-3.5 h-3.5 text-red-500" /> :
+                           <Wifi className="w-3.5 h-3.5" />}
+                          Test
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleSync(); }}
+                          disabled={syncing}
+                          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg transition-colors bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-60 font-medium"
+                        >
+                          {syncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                          {syncing ? "Senkronize…" : "Senkronize Et"}
+                        </button>
+                      </div>
+                    )}
                     {conn && (
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
@@ -355,6 +425,43 @@ export default function BaglantiPage() {
                     {open === p.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                   </div>
                 </button>
+
+                {p.id === "trendyol" && conn && (syncResult || lastSyncedAt) && (
+                  <div className={`px-5 py-2.5 border-t text-xs flex items-start gap-2.5 flex-wrap ${
+                    syncResult?.errors?.length
+                      ? "bg-amber-50 border-amber-100"
+                      : syncResult
+                      ? "bg-green-50 border-green-100"
+                      : "bg-gray-50 border-gray-100"
+                  }`}>
+                    {syncResult ? (
+                      <>
+                        {syncResult.errors.length === 0
+                          ? <CheckCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-green-600" />
+                          : <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-amber-500" />
+                        }
+                        <div className="flex-1">
+                          <span className={`font-medium ${syncResult.errors.length ? "text-amber-700" : "text-green-700"}`}>
+                            {syncResult.products} ürün, {syncResult.orders} sipariş senkronize edildi
+                          </span>
+                          {syncResult.errors.length > 0 && (
+                            <div className="mt-0.5 space-y-0.5 text-amber-600">
+                              {syncResult.errors.map((e, i) => <div key={i}>{e}</div>)}
+                            </div>
+                          )}
+                        </div>
+                        {lastSyncedAt && (
+                          <span className="text-gray-400 ml-auto">{formatSyncTime(lastSyncedAt)}</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-gray-400" />
+                        <span className="text-gray-500">Son senkron: {formatSyncTime(lastSyncedAt)}</span>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {open !== p.id && (
                   <div className={`px-5 pb-3 grid grid-cols-2 gap-1.5 ${p.comingSoon ? "opacity-50" : ""}`}>

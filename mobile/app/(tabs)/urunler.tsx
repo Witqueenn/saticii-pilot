@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Modal,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,12 +22,16 @@ interface Product {
   id: string;
   name: string;
   marketplace_product_id: string;
+  category: string;
+  description: string | null;
   stock: number;
   price: number;
   description_score: number;
   seo_score: number;
   return_rate: number;
   marketplace: string;
+  improved_description: string | null;
+  ai_suggestions: string[] | null;
 }
 
 function ScorePill({ score, label }: { score: number; label: string }) {
@@ -63,13 +68,16 @@ export default function UrunlerScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<Product | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [showImproved, setShowImproved] = useState(false);
+  const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase
       .from("products")
-      .select("id, name, marketplace_product_id, stock, price, description_score, seo_score, return_rate, marketplace")
+      .select("id, name, marketplace_product_id, category, description, stock, price, description_score, seo_score, return_rate, marketplace, improved_description, ai_suggestions")
       .eq("seller_id", user.id)
       .order("description_score", { ascending: true });
     setProducts(data ?? []);
@@ -96,6 +104,37 @@ export default function UrunlerScreen() {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  }
+
+  async function improveDescription(p: Product) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    setGenerating(true);
+    try {
+      const res = await fetch(`${apiUrl}/api/ai/improve-product`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          product_id: p.id,
+          product_name: p.name,
+          category: p.category ?? "",
+          description: p.description ?? "",
+        }),
+      });
+      const data = await res.json();
+      if (data.improved) {
+        const updated = { ...p, improved_description: data.improved, ai_suggestions: data.suggestions ?? p.ai_suggestions };
+        setSelected(updated);
+        setProducts((prev) => prev.map((item) => item.id === p.id ? updated : item));
+        setShowImproved(true);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } finally {
+      setGenerating(false);
+    }
   }
 
   const SORTS = [
@@ -228,15 +267,51 @@ export default function UrunlerScreen() {
               <ScoreBar label="Açıklama Skoru" score={selected.description_score ?? 0} labelColor={t.textSub} trackColor={t.input} />
               <ScoreBar label="SEO Skoru" score={selected.seo_score ?? 0} labelColor={t.textSub} trackColor={t.input} />
 
-              {(selected.description_score < 50 || selected.seo_score < 50) && (
+              {(selected.ai_suggestions ?? []).length > 0 && (
                 <View style={[styles.aiTip, { backgroundColor: t.pillBg, borderColor: "#fed7aa" }]}>
                   <Ionicons name="bulb" size={18} color={t.orange} />
-                  <Text style={styles.aiTipText}>
-                    {selected.description_score < 50
-                      ? "Açıklama skoru düşük — ürün açıklamasını detaylandır ve anahtar kelimeleri güncelle."
-                      : "SEO skoru düşük — başlık ve açıklama arama optimizasyonu için güncellenmeli."}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    {(selected.ai_suggestions ?? []).map((s, i) => (
+                      <Text key={i} style={[styles.aiTipText, { marginBottom: i < (selected.ai_suggestions?.length ?? 0) - 1 ? 4 : 0 }]}>
+                        → {s}
+                      </Text>
+                    ))}
+                  </View>
                 </View>
+              )}
+
+              {/* AI Improved Description */}
+              <TouchableOpacity
+                style={[styles.improveBtn, { backgroundColor: t.orange }, generating && { opacity: 0.6 }]}
+                onPress={() => improveDescription(selected)}
+                disabled={generating}
+              >
+                {generating ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name="sparkles" size={16} color="#fff" />
+                )}
+                <Text style={styles.improveBtnText}>
+                  {generating ? "Oluşturuluyor..." : "AI ile Açıklama Oluştur"}
+                </Text>
+              </TouchableOpacity>
+
+              {selected.improved_description && (
+                <>
+                  <TouchableOpacity
+                    style={styles.showImprovedToggle}
+                    onPress={() => setShowImproved((v) => !v)}
+                  >
+                    <Text style={[styles.showImprovedLabel, { color: t.orange }]}>
+                      {showImproved ? "▲ Kapat" : "▼ İyileştirilmiş Açıklama"}
+                    </Text>
+                  </TouchableOpacity>
+                  {showImproved && (
+                    <View style={[styles.improvedBox, { backgroundColor: "#eff6ff", borderColor: "#bfdbfe" }]}>
+                      <Text style={styles.improvedText}>{selected.improved_description}</Text>
+                    </View>
+                  )}
+                </>
               )}
             </ScrollView>
           )}
@@ -319,4 +394,10 @@ const styles = StyleSheet.create({
   scoreBarFill: { height: 8, borderRadius: 4 },
   aiTip: { flexDirection: "row", gap: 10, borderRadius: 14, padding: 14, marginTop: 8, borderWidth: 1, alignItems: "flex-start" },
   aiTipText: { flex: 1, fontSize: 13, color: "#92400e", lineHeight: 18 },
+  improveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14, marginTop: 12 },
+  improveBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  showImprovedToggle: { paddingVertical: 8, alignItems: "center" },
+  showImprovedLabel: { fontSize: 13, fontWeight: "600" },
+  improvedBox: { borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 8 },
+  improvedText: { fontSize: 14, color: "#1e40af", lineHeight: 22 },
 });

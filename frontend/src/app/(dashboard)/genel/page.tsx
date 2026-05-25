@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  MessageSquare, AlertTriangle, Package, RotateCcw,
+  MessageSquare, AlertTriangle, Package, RotateCcw, ShoppingBag,
   ArrowRight, CheckCircle, Circle, Zap, ShieldCheck,
-  Sparkles, RefreshCw, TrendingUp, TrendingDown, Minus,
+  Sparkles, RefreshCw, TrendingUp, TrendingDown, Minus, Loader2,
+  Flag, Edit2, Check, X as XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -20,17 +21,22 @@ interface Summary {
   lastWeekReturns: number;
   lastWeekPending: number;
   lastWeekUrgent: number;
+  weekOrders: number;
+  weekRevenue: number;
+  lastWeekOrders: number;
 }
 
 interface DayCount {
   label: string;
   returns: number;
   reviews: number;
+  orders: number;
 }
 
 function buildLast7Days(
   returns: { returned_at: string }[],
-  reviews: { reviewed_at?: string; created_at?: string }[]
+  reviews: { reviewed_at?: string; created_at?: string }[],
+  orders: { ordered_at: string }[]
 ): DayCount[] {
   const days: DayCount[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -42,19 +48,28 @@ function buildLast7Days(
       label,
       returns: returns.filter((r) => r.returned_at?.startsWith(key)).length,
       reviews: reviews.filter((r) => (r.reviewed_at ?? r.created_at ?? "").startsWith(key)).length,
+      orders: orders.filter((o) => o.ordered_at?.startsWith(key)).length,
     });
   }
   return days;
 }
 
 function ActivityChart({ data }: { data: DayCount[] }) {
-  const max = Math.max(...data.map((d) => d.reviews + d.returns), 1);
+  const max = Math.max(...data.map((d) => d.reviews + d.returns + d.orders), 1);
+  const hasOrders = data.some((d) => d.orders > 0);
   return (
     <div>
       <div className="flex items-end gap-2 h-20">
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col items-center gap-1">
             <div className="w-full flex items-end gap-0.5" style={{ height: "64px" }}>
+              {hasOrders && (
+                <div
+                  className={`flex-1 rounded-t-sm transition-all ${d.orders === 0 ? "bg-green-100" : "bg-green-400"}`}
+                  style={{ height: `${Math.max((d.orders / max) * 100, d.orders > 0 ? 6 : 2)}%` }}
+                  title={`${d.orders} sipariş`}
+                />
+              )}
               <div
                 className={`flex-1 rounded-t-sm transition-all ${d.reviews === 0 ? "bg-orange-100" : "bg-orange-400"}`}
                 style={{ height: `${Math.max((d.reviews / max) * 100, d.reviews > 0 ? 6 : 2)}%` }}
@@ -71,6 +86,12 @@ function ActivityChart({ data }: { data: DayCount[] }) {
         ))}
       </div>
       <div className="flex items-center gap-4 mt-3">
+        {hasOrders && (
+          <div className="flex items-center gap-1.5">
+            <div className="w-2.5 h-2.5 bg-green-400 rounded-sm" />
+            <span className="text-xs text-gray-500">Sipariş</span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <div className="w-2.5 h-2.5 bg-orange-400 rounded-sm" />
           <span className="text-xs text-gray-500">Yorum</span>
@@ -190,12 +211,301 @@ const platformStatuses = [
   { name: "Amazon TR", status: "Planlanıyor", color: "bg-gray-100 text-gray-400" },
 ];
 
+// ── Sağlık Skoru ─────────────────────────────────────────────────────────────
+
+interface ScoreBreakdown {
+  replyScore: number;   // 0-30
+  urgentScore: number;  // 0-25
+  productScore: number; // 0-25
+  returnScore: number;  // 0-20
+  total: number;
+}
+
+function computeHealthScore(s: Summary): ScoreBreakdown {
+  // Reply rate (0-30)
+  const replyScore = s.totalReviews > 0
+    ? Math.round(((s.totalReviews - s.pendingReviews) / s.totalReviews) * 30)
+    : 30;
+
+  // Urgent review penalty (0-25), each unresolved urgent = -5
+  const urgentScore = Math.max(0, 25 - s.urgentReviews * 5);
+
+  // Product quality (0-25)
+  const productScore = s.totalProducts > 0
+    ? Math.round(((s.totalProducts - s.lowScoreProducts) / s.totalProducts) * 25)
+    : 25;
+
+  // Return rate vs orders (0-20)
+  let returnScore = 20;
+  if (s.weekOrders > 0) {
+    const rate = s.weekReturns / s.weekOrders;
+    if (rate <= 0.05) returnScore = 20;
+    else if (rate <= 0.10) returnScore = 15;
+    else if (rate <= 0.20) returnScore = 8;
+    else returnScore = 0;
+  } else if (s.weekReturns > 0) {
+    returnScore = 5;
+  }
+
+  return {
+    replyScore,
+    urgentScore,
+    productScore,
+    returnScore,
+    total: Math.min(100, replyScore + urgentScore + productScore + returnScore),
+  };
+}
+
+function scoreColor(total: number) {
+  if (total >= 80) return { ring: "text-green-600", bg: "bg-green-50", border: "border-green-200", bar: "bg-green-500", label: "Mükemmel" };
+  if (total >= 60) return { ring: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200", bar: "bg-yellow-400", label: "İyi" };
+  if (total >= 40) return { ring: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200", bar: "bg-orange-400", label: "Orta" };
+  return { ring: "text-red-600", bg: "bg-red-50", border: "border-red-200", bar: "bg-red-500", label: "Dikkat" };
+}
+
+function HealthScoreCard({ s }: { s: Summary }) {
+  const bd = computeHealthScore(s);
+  const c = scoreColor(bd.total);
+
+  const components = [
+    { label: "Yorum Yanıt Oranı", score: bd.replyScore, max: 30 },
+    { label: "Acil Yorum Temizliği", score: bd.urgentScore, max: 25 },
+    { label: "Ürün Açıklama Kalitesi", score: bd.productScore, max: 25 },
+    { label: "İade Oranı", score: bd.returnScore, max: 20 },
+  ];
+
+  return (
+    <div className={`${c.bg} ${c.border} border rounded-2xl p-5`}>
+      <div className="flex items-center gap-5">
+        {/* Büyük skor */}
+        <div className="flex-shrink-0 text-center">
+          <p className={`text-5xl font-black leading-none ${c.ring}`}>{bd.total}</p>
+          <p className="text-xs text-gray-500 mt-1.5 font-medium">/ 100</p>
+          <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full mt-2 inline-block ${c.bg} ${c.ring} border ${c.border}`}>
+            {c.label}
+          </span>
+        </div>
+
+        {/* Separator */}
+        <div className="w-px self-stretch bg-gray-200 flex-shrink-0" />
+
+        {/* Breakdown */}
+        <div className="flex-1 space-y-2 min-w-0">
+          <p className="text-xs font-semibold text-gray-600 mb-2.5">Mağaza Sağlık Skoru</p>
+          {components.map(({ label, score, max }) => (
+            <div key={label} className="flex items-center gap-2">
+              <span className="text-[11px] text-gray-500 w-36 flex-shrink-0 truncate">{label}</span>
+              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${c.bar} rounded-full transition-all duration-500`}
+                  style={{ width: `${(score / max) * 100}%` }}
+                />
+              </div>
+              <span className="text-[11px] font-semibold text-gray-600 w-8 text-right flex-shrink-0">
+                {score}/{max}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Haftalık Hedef ───────────────────────────────────────────────────────────
+
+function WeeklyGoalCard({
+  revenue,
+  goal,
+  editing,
+  goalInput,
+  saving,
+  onEdit,
+  onCancel,
+  onInputChange,
+  onSave,
+}: {
+  revenue: number;
+  goal: number | null;
+  editing: boolean;
+  goalInput: string;
+  saving: boolean;
+  onEdit: () => void;
+  onCancel: () => void;
+  onInputChange: (v: string) => void;
+  onSave: () => void;
+}) {
+  const now = new Date();
+  const dow = now.getDay(); // 0=Sun
+  const daysIntoWeek = dow === 0 ? 7 : dow;
+  const weekPct = Math.round((daysIntoWeek / 7) * 100);
+
+  if (editing) {
+    return (
+      <div className="bg-white rounded-xl border border-orange-200 p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Flag className="w-4 h-4 text-orange-500" />
+          <p className="text-sm font-semibold text-gray-900">Haftalık Gelir Hedefi Belirle</p>
+        </div>
+        <p className="text-xs text-gray-500">Bu haftaya ait toplam ciro hedefini gir (₺)</p>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">₺</span>
+            <input
+              type="number"
+              min="1"
+              value={goalInput}
+              onChange={(e) => onInputChange(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") onSave(); if (e.key === "Escape") onCancel(); }}
+              placeholder="Örn: 10000"
+              autoFocus
+              className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+          </div>
+          <button
+            onClick={onSave}
+            disabled={saving || !goalInput}
+            className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+            Kaydet
+          </button>
+          <button onClick={onCancel} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+            <XIcon className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!goal) {
+    return (
+      <div className="bg-white rounded-xl border border-dashed border-gray-300 p-5 flex items-center gap-4">
+        <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center flex-shrink-0">
+          <Flag className="w-5 h-5 text-orange-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">Haftalık hedef belirle</p>
+          <p className="text-xs text-gray-400 mt-0.5">Ciro hedefinizi girin, ilerlemenizi her gün takip edin</p>
+        </div>
+        <button
+          onClick={onEdit}
+          className="flex items-center gap-1.5 text-sm text-orange-600 border border-orange-200 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors font-medium flex-shrink-0"
+        >
+          <Flag className="w-3.5 h-3.5" /> Hedef Belirle
+        </button>
+      </div>
+    );
+  }
+
+  const pct = Math.min(100, Math.round((revenue / goal) * 100));
+  const remaining = Math.max(0, goal - revenue);
+  const isAhead = pct >= weekPct;
+  const isComplete = pct >= 100;
+
+  let msg = "";
+  let msgColor = "text-gray-500";
+  if (isComplete) {
+    msg = "Tebrikler! Haftalık hedefinize ulaştınız 🎉";
+    msgColor = "text-green-600";
+  } else if (isAhead) {
+    msg = `Harika gidiyorsunuz! ${remaining.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 })} kaldı`;
+    msgColor = "text-green-600";
+  } else if (pct < weekPct - 15) {
+    msg = `Hedefin gerisinde. Günde ortalama ${Math.ceil(remaining / Math.max(1, 7 - daysIntoWeek)).toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 })} daha satış yapmalısınız`;
+    msgColor = "text-orange-600";
+  } else {
+    msg = `${remaining.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 })} daha kazanmanız gerekiyor`;
+    msgColor = "text-gray-500";
+  }
+
+  return (
+    <div className={`bg-white rounded-xl border p-5 space-y-4 ${isComplete ? "border-green-200" : "border-gray-200"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Flag className={`w-4 h-4 ${isComplete ? "text-green-500" : "text-orange-500"}`} />
+          <p className="text-sm font-semibold text-gray-900">Haftalık Gelir Hedefi</p>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isComplete ? "bg-green-100 text-green-700" : isAhead ? "bg-green-50 text-green-600" : "bg-orange-50 text-orange-600"}`}>
+            %{pct}
+          </span>
+        </div>
+        <button
+          onClick={onEdit}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <Edit2 className="w-3 h-3" /> Değiştir
+        </button>
+      </div>
+
+      {/* Gelir / Hedef */}
+      <div className="flex items-baseline gap-1.5">
+        <span className={`text-3xl font-black ${isComplete ? "text-green-600" : "text-gray-900"}`}>
+          {revenue.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 })}
+        </span>
+        <span className="text-sm text-gray-400 font-medium">
+          / {goal.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 })}
+        </span>
+      </div>
+
+      {/* Progress bar — gelir */}
+      <div className="space-y-1.5">
+        <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-700 ${isComplete ? "bg-green-500" : isAhead ? "bg-green-400" : "bg-orange-400"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {/* Hafta ilerleme işareti */}
+        <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-200 rounded-full transition-all duration-700"
+            style={{ width: `${weekPct}%` }}
+          />
+          <div
+            className="absolute top-0 w-0.5 h-full bg-blue-400"
+            style={{ left: `${weekPct}%` }}
+            title={`Haftanın %${weekPct}'i geçti`}
+          />
+        </div>
+        <div className="flex items-center justify-between">
+          <p className={`text-xs font-medium ${msgColor}`}>{msg}</p>
+          <p className="text-[10px] text-gray-400">Haftanın %{weekPct}'i ({daysIntoWeek}. gün)</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BRIEF_CACHE_KEY = "sp_daily_brief";
+
+function getBriefCache(): { date: string; items: string[] } | null {
+  try {
+    const raw = localStorage.getItem(BRIEF_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function setBriefCache(items: string[]) {
+  const today = new Date().toISOString().split("T")[0];
+  localStorage.setItem(BRIEF_CACHE_KEY, JSON.stringify({ date: today, items }));
+}
+
 export default function DashboardPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [chartData, setChartData] = useState<DayCount[]>([]);
   const [loading, setLoading] = useState(true);
   const [shopName, setShopName] = useState("");
   const [isMarketplaceConnected, setIsMarketplaceConnected] = useState(false);
+  const [briefItems, setBriefItems] = useState<string[] | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [weeklyGoal, setWeeklyGoal] = useState<number | null>(null);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
+  const [savingGoal, setSavingGoal] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -218,6 +528,9 @@ export default function DashboardPage() {
         { data: allReviews },
         { data: lastWeekReviews },
         { data: credentials },
+        { data: weekOrders },
+        { data: lastWeekOrders },
+        { data: sellerRow },
       ] = await Promise.all([
         supabase.from("reviews").select("is_urgent, is_replied").eq("seller_id", user.id),
         supabase.from("products").select("description_score, seo_score").eq("seller_id", user.id),
@@ -227,13 +540,19 @@ export default function DashboardPage() {
         supabase.from("reviews").select("reviewed_at, is_replied, is_urgent").eq("seller_id", user.id),
         supabase.from("reviews").select("is_replied, is_urgent").eq("seller_id", user.id).gte("reviewed_at", twoWeeksAgo).lt("reviewed_at", weekAgo),
         supabase.from("marketplace_credentials").select("id").eq("seller_id", user.id).limit(1),
+        supabase.from("orders").select("ordered_at, total_price").eq("seller_id", user.id).gte("ordered_at", weekAgo),
+        supabase.from("orders").select("id").eq("seller_id", user.id).gte("ordered_at", twoWeeksAgo).lt("ordered_at", weekAgo),
+        supabase.from("sellers").select("weekly_revenue_goal").eq("id", user.id).single(),
       ]);
+
+      if (sellerRow?.weekly_revenue_goal) setWeeklyGoal(sellerRow.weekly_revenue_goal);
 
       setIsMarketplaceConnected((credentials?.length ?? 0) > 0);
 
       const thisWeekReviews = (allReviews ?? []).filter(r => r.reviewed_at >= weekAgo);
+      const weekRevenue = (weekOrders ?? []).reduce((s: number, o: { total_price: number | null }) => s + (o.total_price ?? 0), 0);
 
-      setSummary({
+      const s: Summary = {
         totalReviews: reviews?.length ?? 0,
         urgentReviews: reviews?.filter((r) => r.is_urgent && !r.is_replied).length ?? 0,
         pendingReviews: reviews?.filter((r) => !r.is_replied).length ?? 0,
@@ -243,13 +562,70 @@ export default function DashboardPage() {
         lastWeekReturns: lastWeekReturns?.length ?? 0,
         lastWeekPending: lastWeekReviews?.filter(r => !r.is_replied).length ?? 0,
         lastWeekUrgent: lastWeekReviews?.filter(r => r.is_urgent).length ?? 0,
-      });
+        weekOrders: weekOrders?.length ?? 0,
+        weekRevenue,
+        lastWeekOrders: lastWeekOrders?.length ?? 0,
+      };
+      setSummary(s);
 
-      setChartData(buildLast7Days(allReturns ?? [], allReviews ?? []));
+      const allOrdersForChart = weekOrders ?? [];
+      setChartData(buildLast7Days(allReturns ?? [], allReviews ?? [], allOrdersForChart));
       setLoading(false);
+      loadBrief(s);
     }
     load();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadBrief(s: Summary, force = false) {
+    if (!s) return;
+    const today = new Date().toISOString().split("T")[0];
+    const cached = getBriefCache();
+    if (!force && cached && cached.date === today) {
+      setBriefItems(cached.items);
+      return;
+    }
+    setBriefLoading(true);
+    try {
+      const res = await fetch("/api/ai/daily-brief", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          urgentReviews: s.urgentReviews,
+          pendingReviews: s.pendingReviews,
+          pendingQuestions: 0,
+          weekReturns: s.weekReturns,
+          lowScoreProducts: s.lowScoreProducts,
+          weekOrders: s.weekOrders,
+          weekRevenue: s.weekRevenue,
+        }),
+      });
+      const data = await res.json();
+      const items: string[] = data.items ?? [];
+      setBriefItems(items);
+      setBriefCache(items);
+    } finally {
+      setBriefLoading(false);
+    }
+  }
+
+  async function saveGoal() {
+    const val = parseFloat(goalInput.replace(/\./g, "").replace(",", "."));
+    if (isNaN(val) || val <= 0) return;
+    setSavingGoal(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("sellers").upsert({ id: user.id, weekly_revenue_goal: val });
+        setWeeklyGoal(val);
+      }
+    } finally {
+      setSavingGoal(false);
+      setEditingGoal(false);
+      setGoalInput("");
+    }
+  }
 
   const hasData = summary !== null && (summary.urgentReviews > 0 || summary.lowScoreProducts > 0 || summary.weekReturns > 0);
   const hasProducts = (summary?.totalProducts ?? 0) > 0;
@@ -299,6 +675,19 @@ export default function DashboardPage() {
       delta: null,
       href: "/urunler",
     },
+    {
+      label: "Bu Haftaki Sipariş",
+      value: summary?.weekOrders ?? 0,
+      sub: summary?.weekRevenue
+        ? `${summary.weekRevenue.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 })} ciro`
+        : "Sipariş verisi bekleniyor",
+      emptyHint: "Bağlandığında haftalık siparişler burada görünür",
+      icon: ShoppingBag,
+      color: "text-green-600",
+      bg: "bg-green-50",
+      delta: summary ? <DeltaBadge current={summary.weekOrders} previous={summary.lastWeekOrders} /> : null,
+      href: "/siparisler",
+    },
   ];
 
   return (
@@ -340,6 +729,69 @@ export default function DashboardPage() {
       </div>
 
       {!loading && !isMarketplaceConnected && <DemoAICard />}
+
+      {/* Haftalık Hedef */}
+      {!loading && isMarketplaceConnected && (
+        <WeeklyGoalCard
+          revenue={summary?.weekRevenue ?? 0}
+          goal={weeklyGoal}
+          editing={editingGoal}
+          goalInput={goalInput}
+          saving={savingGoal}
+          onEdit={() => { setGoalInput(weeklyGoal ? String(weeklyGoal) : ""); setEditingGoal(true); }}
+          onCancel={() => { setEditingGoal(false); setGoalInput(""); }}
+          onInputChange={setGoalInput}
+          onSave={saveGoal}
+        />
+      )}
+
+      {/* Sağlık Skoru */}
+      {!loading && summary && isMarketplaceConnected && (
+        <HealthScoreCard s={summary} />
+      )}
+
+      {/* AI Günlük Brief */}
+      {!loading && isMarketplaceConnected && (
+        <div className="bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <p className="text-sm font-semibold text-gray-900">AI Günlük Analizi</p>
+              <span className="text-[10px] bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">Bugün için</span>
+            </div>
+            <button
+              onClick={() => summary && loadBrief(summary, true)}
+              disabled={briefLoading}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-orange-600 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${briefLoading ? "animate-spin" : ""}`} />
+              Yenile
+            </button>
+          </div>
+
+          {briefLoading ? (
+            <div className="flex items-center gap-2 py-3">
+              <Loader2 className="w-4 h-4 text-orange-400 animate-spin flex-shrink-0" />
+              <p className="text-sm text-gray-500">Veriler analiz ediliyor…</p>
+            </div>
+          ) : briefItems && briefItems.length > 0 ? (
+            <ul className="space-y-2">
+              {briefItems.map((item, i) => (
+                <li key={i} className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                    {i + 1}
+                  </span>
+                  <p className="text-sm text-gray-700 leading-relaxed">{item}</p>
+                </li>
+              ))}
+            </ul>
+          ) : briefItems && briefItems.length === 0 ? (
+            <p className="text-sm text-gray-500 py-2">Bugün bekleyen kritik bir aksiyon görünmüyor. Her şey yolunda!</p>
+          ) : null}
+        </div>
+      )}
 
       {/* 7 Günlük Aktivite */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">

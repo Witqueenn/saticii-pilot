@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabase } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import OpenAI from "openai";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -14,6 +13,43 @@ interface RawReturn {
   reason_text: string;
   customer_comment?: string;
   returned_at?: string;
+}
+
+async function classifyReturns(list: string): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY ayarlanmamış");
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1000,
+      messages: [{
+        role: "user",
+        content: `Aşağıdaki e-ticaret iade kayıtlarını sınıflandır. Her biri için tam olarak bu formatta bir satır yaz:
+{"i":NUMARA,"reason":"KATEGORI"}
+
+Kategoriler (sadece bunları kullan):
+- beden_uyumsuzlugu: beden, numara, ölçü, büyük, küçük, dar, geniş
+- renk_farki: renk, ton, fotoğraftan farklı
+- kalite_sorunu: kalite, kumaş, dikiş, yırtık, defolu, ince
+- yanlis_urun: yanlış ürün, farklı ürün, başka ürün
+- hasarli: hasarlı, kırık, ezilmiş, bozuk, paket
+- diger: diğer tüm durumlar
+
+${list}`,
+      }],
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Anthropic API hatası: ${res.status}`);
+  const data = await res.json() as { content: { type: string; text: string }[] };
+  return data.content?.[0]?.text ?? "";
 }
 
 export async function POST(req: NextRequest) {
@@ -29,42 +65,23 @@ export async function POST(req: NextRequest) {
   if (!returns?.length) return NextResponse.json({ error: "İade kaydı bulunamadı" }, { status: 400 });
   if (returns.length > 200) return NextResponse.json({ error: "Maksimum 200 kayıt yüklenebilir" }, { status: 400 });
 
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
   const list = returns
     .map((r, i) => `${i + 1}. Ürün: ${r.product_name} | Sebep: ${r.reason_text}`)
     .join("\n");
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    max_tokens: 1000,
-    temperature: 0,
-    messages: [{
-      role: "user",
-      content: `Aşağıdaki e-ticaret iade kayıtlarını sınıflandır. Her biri için tam olarak bu formatta bir satır yaz:
-{"i":NUMARA,"reason":"KATEGORI"}
-
-Kategoriler (sadece bunları kullan):
-- beden_uyumsuzlugu: beden, numara, ölçü, büyük, küçük, dar, geniş
-- renk_farki: renk, ton, fotoğraftan farklı
-- kalite_sorunu: kalite, kumaş, dikiş, yırtık, defolu, ince
-- yanlis_urun: yanlış ürün, farklı ürün, başka ürün
-- hasarli: hasarlı, kırık, ezilmiş, bozuk, paket
-- diger: diğer tüm durumlar
-
-${list}`,
-    }],
-  });
-
-  const text = completion.choices[0]?.message?.content ?? "";
   const classifications: Record<number, string> = {};
-  for (const line of text.split("\n")) {
-    try {
-      const parsed = JSON.parse(line.trim());
-      if (parsed.i !== undefined && VALID_REASONS.includes(parsed.reason)) {
-        classifications[parsed.i] = parsed.reason;
-      }
-    } catch {}
+  try {
+    const text = await classifyReturns(list);
+    for (const line of text.split("\n")) {
+      try {
+        const parsed = JSON.parse(line.trim());
+        if (parsed.i !== undefined && VALID_REASONS.includes(parsed.reason)) {
+          classifications[parsed.i] = parsed.reason;
+        }
+      } catch {}
+    }
+  } catch {
+    // AI başarısız olursa "diger" ile devam et
   }
 
   const serviceSupabase = createSupabase(SUPABASE_URL, SERVICE_ROLE);

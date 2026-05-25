@@ -18,6 +18,8 @@ celery_app = Celery(
         "app.workers.tasks.review_tasks",
         "app.workers.tasks.product_tasks",
         "app.workers.tasks.return_tasks",
+        "app.workers.tasks.sync_tasks",
+        "app.workers.tasks.alert_tasks",
     ],
 )
 
@@ -42,6 +44,41 @@ celery_app.conf.update(
         "weekly-product-analysis": {
             "task": "app.workers.tasks.product_tasks.analyze_all_products",
             "schedule": crontab(hour=9, minute=0, day_of_week=1),
+        },
+        # Her 4 saatte bir Trendyol yorum senkronizasyonu
+        "trendyol-review-sync": {
+            "task": "app.workers.tasks.sync_tasks.sync_all_sellers_trendyol",
+            "schedule": crontab(minute=0, hour="*/4"),
+        },
+        # Her gün 06:00'da Trendyol ürün senkronizasyonu
+        "trendyol-product-sync": {
+            "task": "app.workers.tasks.sync_tasks.sync_all_sellers_trendyol_products",
+            "schedule": crontab(hour=6, minute=0),
+        },
+        # Her 6 saatte bir Trendyol iade senkronizasyonu
+        "trendyol-returns-sync": {
+            "task": "app.workers.tasks.sync_tasks.sync_all_sellers_trendyol_returns",
+            "schedule": crontab(minute=30, hour="*/6"),
+        },
+        # Her 2 saatte bir Trendyol müşteri soru senkronizasyonu
+        "trendyol-questions-sync": {
+            "task": "app.workers.tasks.sync_tasks.sync_all_sellers_trendyol_questions",
+            "schedule": crontab(minute=0, hour="*/2"),
+        },
+        # Her 3 saatte bir Trendyol sipariş senkronizasyonu
+        "trendyol-orders-sync": {
+            "task": "app.workers.tasks.sync_tasks.sync_all_sellers_trendyol_orders",
+            "schedule": crontab(minute=15, hour="*/3"),
+        },
+        # Her sabah 09:30'da stok alarm kontrolü
+        "daily-low-stock-check": {
+            "task": "app.workers.tasks.alert_tasks.check_low_stock",
+            "schedule": crontab(hour=9, minute=30),
+        },
+        # Her sabah 09:45'te yüksek iade oranı alarm kontrolü
+        "daily-high-return-rate-check": {
+            "task": "app.workers.tasks.alert_tasks.check_high_return_rate",
+            "schedule": crontab(hour=9, minute=45),
         },
     },
 )

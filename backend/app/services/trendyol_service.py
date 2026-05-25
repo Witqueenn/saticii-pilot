@@ -59,3 +59,19 @@ class TrendyolClient:
             f"/suppliers/{self.supplier_id}/claims",
             params={"page": page, "size": size},
         )
+
+    def get_reviews(self, page: int = 0, size: int = 100, start_date: Optional[int] = None, end_date: Optional[int] = None) -> dict:
+        """Ürün yorumlarını çek (Trendyol Seller API)."""
+        params: dict = {"page": page, "size": size, "orderByField": "CreatedDate", "orderByDirection": "DESC"}
+        if start_date:
+            params["startDate"] = start_date
+        if end_date:
+            params["endDate"] = end_date
+        return self._get(f"/suppliers/{self.supplier_id}/reviews", params=params)
+
+    def get_all_questions(self, page: int = 0, size: int = 100) -> dict:
+        """Tüm durumlardan müşteri sorularını çek (WaitingForAnswer + Answered)."""
+        return self._get(
+            f"/suppliers/{self.supplier_id}/questions",
+            params={"page": page, "size": size},
+        )

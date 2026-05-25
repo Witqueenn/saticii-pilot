@@ -19,7 +19,7 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: t.orange,
         tabBarInactiveTintColor: t.textMuted,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginBottom: 2 },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: "600", marginBottom: 2 },
         tabBarStyle: {
           backgroundColor: t.tabBar,
           borderTopWidth: 1,
@@ -31,9 +31,10 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Özet", tabBarIcon: (p) => <TabIcon focused={p.focused} active="home" inactive="home-outline" color={p.color} /> }} />
-      <Tabs.Screen name="yorumlar" options={{ title: "Yorumlar", tabBarBadge: badges.urgentReviews > 0 ? badges.urgentReviews : undefined, tabBarBadgeStyle: { backgroundColor: "#ef4444", fontSize: 10 }, tabBarIcon: (p) => <TabIcon focused={p.focused} active="chatbubble" inactive="chatbubble-outline" color={p.color} /> }} />
-      <Tabs.Screen name="iadeler" options={{ title: "İadeler", tabBarBadge: badges.pendingReturns > 0 ? badges.pendingReturns : undefined, tabBarBadgeStyle: { backgroundColor: "#ef4444", fontSize: 10 }, tabBarIcon: (p) => <TabIcon focused={p.focused} active="cube" inactive="cube-outline" color={p.color} /> }} />
-      <Tabs.Screen name="urunler" options={{ title: "Ürünler", tabBarIcon: (p) => <TabIcon focused={p.focused} active="cube" inactive="cube-outline" color={p.color} /> }} />
+      <Tabs.Screen name="yorumlar" options={{ title: "Yorumlar", tabBarBadge: (badges.urgentReviews + badges.pendingQuestions) > 0 ? (badges.urgentReviews + badges.pendingQuestions) : undefined, tabBarBadgeStyle: { backgroundColor: "#ef4444", fontSize: 10 }, tabBarIcon: (p) => <TabIcon focused={p.focused} active="chatbubble" inactive="chatbubble-outline" color={p.color} /> }} />
+      <Tabs.Screen name="siparisler" options={{ title: "Siparişler", tabBarIcon: (p) => <TabIcon focused={p.focused} active="bag" inactive="bag-outline" color={p.color} /> }} />
+      <Tabs.Screen name="iadeler" options={{ title: "İadeler", tabBarBadge: badges.pendingReturns > 0 ? badges.pendingReturns : undefined, tabBarBadgeStyle: { backgroundColor: "#ef4444", fontSize: 10 }, tabBarIcon: (p) => <TabIcon focused={p.focused} active="return-down-back" inactive="return-down-back-outline" color={p.color} /> }} />
+      <Tabs.Screen name="urunler" options={{ title: "Ürünler", tabBarIcon: (p) => <TabIcon focused={p.focused} active="pricetag" inactive="pricetag-outline" color={p.color} /> }} />
       <Tabs.Screen name="ayarlar" options={{ title: "Ayarlar", tabBarIcon: (p) => <TabIcon focused={p.focused} active="settings" inactive="settings-outline" color={p.color} /> }} />
       <Tabs.Screen name="mesajlar" options={{ href: null }} />
       <Tabs.Screen name="istatistik" options={{ href: null }} />

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { Resend } from "resend";
 
 function getResend() {
@@ -27,6 +29,8 @@ interface WeekStats {
   urgentUnreplied: number;
   returnCount: number;
   returnReasons: Record<string, number>;
+  orderCount: number;
+  orderRevenue: number;
 }
 
 interface PendingReview {
@@ -46,6 +50,7 @@ interface SellerReport {
   urgentPending: PendingReview[];
 }
 
+
 async function buildSellerReport(
   supabase: SupabaseClient,
   seller: { id: string; shop_name: string; email: string }
@@ -54,7 +59,7 @@ async function buildSellerReport(
   const week1Start = new Date(now.getTime() - 7 * 86400000).toISOString();
   const week2Start = new Date(now.getTime() - 14 * 86400000).toISOString();
 
-  const [thisReviews, lastReviews, thisReturns, lastReturns, pendingRows] =
+  const [thisReviews, lastReviews, thisReturns, lastReturns, pendingRows, thisOrders] =
     await Promise.all([
       supabase
         .from("reviews")
@@ -86,11 +91,18 @@ async function buildSellerReport(
         .eq("is_replied", false)
         .order("reviewed_at", { ascending: false })
         .limit(3),
+      supabase
+        .from("orders")
+        .select("total_price")
+        .eq("seller_id", seller.id)
+        .gte("ordered_at", week1Start),
     ]);
 
   const tr = thisReviews.data ?? [];
   const lr = lastReviews.data ?? [];
   const ret = thisReturns.data ?? [];
+  const ord = thisOrders.data ?? [];
+  const orderRevenue = ord.reduce((s, o) => s + (o.total_price ?? 0), 0);
 
   const returnReasons: Record<string, number> = {};
   for (const r of ret) {
@@ -128,12 +140,16 @@ async function buildSellerReport(
       urgentUnreplied: tr.filter((r) => r.is_urgent && !r.is_replied).length,
       returnCount: ret.length,
       returnReasons,
+      orderCount: ord.length,
+      orderRevenue: Math.round(orderRevenue),
     },
     lastWeek: {
       reviewCount: lr.length,
       avgRating: Math.round(lastAvg * 10) / 10,
       urgentCount: lr.filter((r) => r.is_urgent).length,
       returnCount: (lastReturns.data ?? []).length,
+      orderCount: 0,
+      orderRevenue: 0,
     },
     urgentPending: pending,
   };
@@ -349,18 +365,34 @@ function buildEmail(r: SellerReport, dashboardUrl: string): string {
         <tr>${kpiHtml}</tr>
       </table>
 
+      ${t.orderCount > 0 ? `
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <p style="margin:0 0 2px;font-size:12px;font-weight:700;color:#15803d">🛒 Bu Haftaki Siparişler</p>
+          <p style="margin:0;font-size:13px;color:#166534">${t.orderCount} sipariş &nbsp;·&nbsp; ${t.orderRevenue.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 })} ciro</p>
+        </div>
+        <a href="${dashboardUrl}/siparisler" style="font-size:11px;font-weight:600;color:#15803d;text-decoration:none;background:white;border:1px solid #bbf7d0;padding:6px 12px;border-radius:8px">Detay →</a>
+      </div>` : ""}
       ${urgentHtml}
       ${returnHtml}
       ${actionsHtml}
 
-      <div style="display:flex;gap:10px;margin-bottom:24px">
+      <div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">
         <a href="${dashboardUrl}/yorumlar"
-           style="flex:1;display:block;background:#f97316;color:white;text-align:center;padding:12px;border-radius:10px;font-weight:600;font-size:13px;text-decoration:none">
-          Yorumları Gör →
+           style="flex:1;min-width:100px;display:block;background:#f97316;color:white;text-align:center;padding:12px;border-radius:10px;font-weight:600;font-size:12px;text-decoration:none">
+          Yorumlar →
+        </a>
+        <a href="${dashboardUrl}/sorular"
+           style="flex:1;min-width:100px;display:block;background:#f3f4f6;color:#374151;text-align:center;padding:12px;border-radius:10px;font-weight:600;font-size:12px;text-decoration:none">
+          Sorular →
+        </a>
+        <a href="${dashboardUrl}/siparisler"
+           style="flex:1;min-width:100px;display:block;background:#f3f4f6;color:#374151;text-align:center;padding:12px;border-radius:10px;font-weight:600;font-size:12px;text-decoration:none">
+          Siparişler →
         </a>
         <a href="${dashboardUrl}/iadeler"
-           style="flex:1;display:block;background:#f3f4f6;color:#374151;text-align:center;padding:12px;border-radius:10px;font-weight:600;font-size:13px;text-decoration:none">
-          İadeleri Gör →
+           style="flex:1;min-width:100px;display:block;background:#f3f4f6;color:#374151;text-align:center;padding:12px;border-radius:10px;font-weight:600;font-size:12px;text-decoration:none">
+          İadeler →
         </a>
       </div>
 
@@ -396,8 +428,9 @@ export async function GET(req: NextRequest) {
 
   const { data: sellers } = await supabase
     .from("sellers")
-    .select("id, email, shop_name, notify_urgent_reviews")
+    .select("id, email, shop_name, notify_urgent_reviews, notify_weekly_report")
     .eq("is_active", true)
+    .eq("notify_weekly_report", true)
     .not("email", "is", null);
 
   if (!sellers || sellers.length === 0) {
@@ -413,7 +446,9 @@ export async function GET(req: NextRequest) {
 
       // Bu haftada hiç aktivite yoksa rapor gönderme
       const hasActivity =
-        report.thisWeek.reviewCount > 0 || report.thisWeek.returnCount > 0;
+        report.thisWeek.reviewCount > 0 ||
+        report.thisWeek.returnCount > 0 ||
+        report.thisWeek.orderCount > 0;
       if (!hasActivity) {
         results.push({ shop: seller.shop_name, status: "skipped_no_activity" });
         continue;
@@ -443,4 +478,48 @@ export async function GET(req: NextRequest) {
 
   const sentCount = results.filter((r) => r.status === "sent").length;
   return NextResponse.json({ sent: sentCount, results });
+}
+
+// Manuel tek-satıcı gönderimi — oturum cookie'siyle yetkilendirilir
+export async function POST() {
+  const cookieStore = await cookies();
+  const sb = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
+  );
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const supabase = getSupabase();
+  const { data: seller } = await supabase
+    .from("sellers")
+    .select("id, email, shop_name")
+    .eq("id", user.id)
+    .single();
+
+  if (!seller?.email) {
+    return NextResponse.json({ error: "Satıcı verisi bulunamadı" }, { status: 400 });
+  }
+
+  const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saticii-pilot.vercel.app";
+
+  try {
+    const report = await buildSellerReport(supabase, seller);
+    const html = buildEmail(report, dashboardUrl);
+    const toEmail = process.env.RESEND_TO_EMAIL ?? seller.email;
+
+    const resend = getResend();
+    const { error } = await resend.emails.send({
+      from: "SatıcıPilot <onboarding@resend.dev>",
+      to: toEmail,
+      subject: `📊 Haftalık rapor — ${seller.shop_name} (${dateRange()})`,
+      html,
+    });
+
+    if (error) return NextResponse.json({ error: "E-posta gönderilemedi" }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }

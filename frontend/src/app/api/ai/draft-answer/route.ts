@@ -7,28 +7,6 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-function buildPrompt(productName: string, rating: number, comment: string, sentiment: string | null): string {
-  const tone = rating <= 2 || sentiment === "acil"
-    ? "özür dileyen, çözüm odaklı ve empatik"
-    : rating === 3
-    ? "anlayışlı ve yardımsever"
-    : "sıcak ve teşekkür eden";
-
-  return `Sen bir Trendyol mağaza sahibisin. Müşteri yorumuna kısa, profesyonel ve samimi bir Türkçe cevap yaz.
-
-Ürün: ${productName}
-Puan: ${rating}/5
-Yorum: "${comment}"
-
-Kurallar:
-- Ton ${tone} olsun
-- Maksimum 3 cümle
-- Müşteriyi adıyla değil "değerli müşterimiz" veya "sayın müşterimiz" diye hitap et
-- Sorun varsa çözüm öner (iade, değişim, iletişim)
-- Gereksiz tekrar etme, doğrudan konuya gir
-- Sadece cevabı yaz, başka açıklama ekleme`;
-}
-
 async function getUser(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
@@ -47,9 +25,20 @@ async function getUser(req: NextRequest) {
   return { user, supabase: sb };
 }
 
-async function generateReply(prompt: string): Promise<string> {
+async function generateAnswer(productName: string, question: string): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY ayarlanmamış");
+
+  const prompt = `Sen bir Trendyol mağaza sahibisin. Müşterinin ürün sorusuna kısa, bilgilendirici ve samimi bir Türkçe cevap yaz.
+
+Ürün: ${productName}
+Soru: "${question}"
+
+Kurallar:
+- Maksimum 2-3 cümle
+- Doğrudan soruyu yanıtla
+- Emin olmadığın bilgi verme; gerekirse "Lütfen iletişime geçin" de
+- Sadece cevabı yaz, başka açıklama ekleme`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -60,7 +49,7 @@ async function generateReply(prompt: string): Promise<string> {
     },
     body: JSON.stringify({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
+      max_tokens: 150,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -79,26 +68,28 @@ export async function POST(req: NextRequest) {
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { user, supabase } = auth;
 
-  const { review_id, product_name, rating, comment, sentiment } = await req.json();
-  if (!comment || !product_name || rating == null) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
+  let body: unknown;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: "Geçersiz istek" }, { status: 400 }); }
 
-  let reply: string;
+  const { question_id, product_name, question } = body as Record<string, unknown>;
+  if (!question || typeof question !== "string" || !product_name || typeof product_name !== "string")
+    return NextResponse.json({ error: "product_name ve question gerekli" }, { status: 400 });
+
+  let answer: string;
   try {
-    reply = await generateReply(buildPrompt(product_name, rating, comment, sentiment));
+    answer = await generateAnswer(product_name, question);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
-  if (review_id && reply) {
+  if (question_id && typeof question_id === "string" && answer) {
     await supabase
-      .from("reviews")
-      .update({ suggested_reply: reply })
-      .eq("id", review_id)
+      .from("questions")
+      .update({ suggested_answer: answer })
+      .eq("id", question_id)
       .eq("seller_id", user.id);
   }
 
-  return NextResponse.json({ reply });
+  return NextResponse.json({ answer });
 }

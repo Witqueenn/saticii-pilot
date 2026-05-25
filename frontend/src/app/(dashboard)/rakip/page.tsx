@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { TrendingDown, TrendingUp, Minus, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingDown, TrendingUp, Minus, RefreshCw, ChevronDown, ChevronUp, Plus, X, Sparkles, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
 import ProGate from "@/components/ProGate";
+import { useToast } from "@/components/Toast";
 
 interface CompetitorRow {
   id: string;
@@ -82,13 +83,33 @@ const STATUS_CONFIG = {
   },
 };
 
+interface AddForm {
+  our_product_name: string;
+  our_price: string;
+  competitor_name: string;
+  competitor_product_name: string;
+  competitor_price: string;
+  category: string;
+}
+
+const EMPTY_FORM: AddForm = {
+  our_product_name: "", our_price: "", competitor_name: "",
+  competitor_product_name: "", competitor_price: "", category: "",
+};
+
 export default function RakipPage() {
+  const { toast } = useToast();
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [filter, setFilter] = useState<"tumu" | "pahali" | "uygun" | "ucuz">("tumu");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastChecked, setLastChecked] = useState<string | null>(null);
   const [plan, setPlan] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState<AddForm>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState<string | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({});
 
   useEffect(() => {
     async function load() {
@@ -145,6 +166,75 @@ export default function RakipPage() {
     load();
   }, []);
 
+  async function addEntry() {
+    const ourPrice = parseFloat(form.our_price);
+    const compPrice = parseFloat(form.competitor_price);
+    if (!form.our_product_name || !form.competitor_name || isNaN(ourPrice) || isNaN(compPrice)) {
+      toast("Ürün adı, rakip adı ve fiyatlar zorunlu", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await supabase.from("competitor_prices").insert({
+        seller_id: user.id,
+        our_product_id: form.our_product_name.toLowerCase().replace(/\s+/g, "-"),
+        our_product_name: form.our_product_name,
+        our_price: ourPrice,
+        competitor_name: form.competitor_name,
+        competitor_product_name: form.competitor_product_name || null,
+        competitor_price: compPrice,
+        category: form.category || null,
+        checked_at: new Date().toISOString(),
+      });
+      toast("Rakip fiyatı eklendi");
+      setForm(EMPTY_FORM);
+      setShowAdd(false);
+      // Sayfayı yenile
+      window.location.reload();
+    } catch {
+      toast("Kaydetme başarısız", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function aiAnalyze(p: ProductSummary) {
+    setAiLoading(p.productId);
+    try {
+      const res = await fetch("/api/ai/price-suggestion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_name: p.productName,
+          our_price: p.ourPrice,
+          category: p.category,
+          competitors: p.competitors.map((c) => ({
+            name: c.competitor_name,
+            price: c.competitor_price,
+          })),
+        }),
+      });
+      const { suggestion } = await res.json();
+      if (suggestion) {
+        setAiSuggestions((prev) => ({ ...prev, [p.productId]: suggestion }));
+      }
+    } catch {
+      toast("AI analizi başarısız", "error");
+    } finally {
+      setAiLoading(null);
+    }
+  }
+
+  async function deleteEntry(id: string) {
+    const supabase = createClient();
+    await supabase.from("competitor_prices").delete().eq("id", id);
+    toast("Rakip fiyatı silindi");
+    window.location.reload();
+  }
+
   const counts = {
     pahali: products.filter((p) => p.status === "pahali").length,
     uygun: products.filter((p) => p.status === "uygun").length,
@@ -162,17 +252,25 @@ export default function RakipPage() {
   return (
     <div className="space-y-6 max-w-4xl w-full">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Rakip Fiyat Analizi</h2>
           <p className="text-gray-500 mt-1 text-sm">Ürünlerinin Trendyol'daki fiyat rekabeti</p>
         </div>
-        {lastChecked && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-2">
-            <RefreshCw className="w-3 h-3" />
-            {timeAgo(lastChecked)}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {lastChecked && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+              <RefreshCw className="w-3 h-3" />
+              {timeAgo(lastChecked)}
+            </div>
+          )}
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Rakip Ekle
+          </button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -321,8 +419,8 @@ export default function RakipPage() {
                       })}
                     </div>
 
-                    {/* Price suggestion */}
-                    {p.status === "pahali" && (
+                    {/* Price suggestion — rule-based */}
+                    {p.status === "pahali" && !aiSuggestions[p.productId] && (
                       <div className="mt-3 bg-orange-50 border border-orange-100 rounded-lg px-4 py-3">
                         <p className="text-xs font-semibold text-orange-700 mb-0.5">Fiyat Önerisi</p>
                         <p className="text-xs text-orange-600">
@@ -331,7 +429,7 @@ export default function RakipPage() {
                         </p>
                       </div>
                     )}
-                    {p.status === "ucuz" && (
+                    {p.status === "ucuz" && !aiSuggestions[p.productId] && (
                       <div className="mt-3 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
                         <p className="text-xs font-semibold text-blue-700 mb-0.5">Fiyat Önerisi</p>
                         <p className="text-xs text-blue-600">
@@ -339,11 +437,125 @@ export default function RakipPage() {
                         </p>
                       </div>
                     )}
+
+                    {/* AI suggestion */}
+                    {aiSuggestions[p.productId] && (
+                      <div className="mt-3 bg-purple-50 border border-purple-100 rounded-lg px-4 py-3">
+                        <p className="text-xs font-semibold text-purple-700 mb-1 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> AI Fiyat Analizi
+                        </p>
+                        <p className="text-xs text-purple-800 leading-relaxed whitespace-pre-wrap">{aiSuggestions[p.productId]}</p>
+                      </div>
+                    )}
+
+                    {/* AI analyze button */}
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        onClick={() => aiAnalyze(p)}
+                        disabled={aiLoading === p.productId}
+                        className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 font-medium disabled:opacity-50 transition-colors"
+                      >
+                        {aiLoading === p.productId
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Analiz ediliyor…</>
+                          : <><Sparkles className="w-3.5 h-3.5" /> AI ile derin analiz</>}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Rakip Ekle Modalı ─────────────────────────── */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Rakip Fiyatı Ekle</h3>
+              <button onClick={() => setShowAdd(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ürün adın *</label>
+                  <input
+                    value={form.our_product_name}
+                    onChange={(e) => setForm((f) => ({ ...f, our_product_name: e.target.value }))}
+                    placeholder="Floral Bluz"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Senin fiyatın (₺) *</label>
+                  <input
+                    type="number"
+                    value={form.our_price}
+                    onChange={(e) => setForm((f) => ({ ...f, our_price: e.target.value }))}
+                    placeholder="299"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Rakip mağaza adı *</label>
+                  <input
+                    value={form.competitor_name}
+                    onChange={(e) => setForm((f) => ({ ...f, competitor_name: e.target.value }))}
+                    placeholder="Rakip Marka"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Rakip fiyatı (₺) *</label>
+                  <input
+                    type="number"
+                    value={form.competitor_price}
+                    onChange={(e) => setForm((f) => ({ ...f, competitor_price: e.target.value }))}
+                    placeholder="249"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Rakip ürün adı</label>
+                  <input
+                    value={form.competitor_product_name}
+                    onChange={(e) => setForm((f) => ({ ...f, competitor_product_name: e.target.value }))}
+                    placeholder="Opsiyonel"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Kategori</label>
+                  <input
+                    value={form.category}
+                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                    placeholder="Bluz, Elbise…"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex justify-end gap-3">
+              <button onClick={() => setShowAdd(false)} className="text-sm text-gray-500 px-4 py-2 hover:bg-gray-50 rounded-lg transition-colors">
+                İptal
+              </button>
+              <button
+                onClick={addEntry}
+                disabled={saving}
+                className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-medium transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Kaydet
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

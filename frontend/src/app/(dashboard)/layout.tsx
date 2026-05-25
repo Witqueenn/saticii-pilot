@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut, ShieldCheck, Link2, Settings, BarChart2, Bell, Users, Megaphone } from "lucide-react";
+import { MessageSquare, Package, RotateCcw, LayoutDashboard, LogOut, ShieldCheck, Link2, Settings, BarChart2, Bell, Users, Megaphone, HelpCircle, ShoppingBag } from "lucide-react";
 import { clsx } from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import OnboardingModal from "@/components/OnboardingModal";
+import { ToastProvider } from "@/components/Toast";
 
 const navItems = [
   { href: "/genel", label: "Genel Bakış", icon: LayoutDashboard, pro: false },
+  { href: "/bildirimler", label: "Bildirimler", icon: Bell, pro: false },
   { href: "/yorumlar", label: "Yorumlar", icon: MessageSquare, pro: false },
+  { href: "/sorular", label: "Müşteri Soruları", icon: HelpCircle, pro: false },
   { href: "/urunler", label: "Ürünler", icon: Package, pro: false },
+  { href: "/siparisler", label: "Siparişler", icon: ShoppingBag, pro: false },
   { href: "/iadeler", label: "İadeler", icon: RotateCcw, pro: false },
   { href: "/rakip", label: "Rakip Analizi", icon: BarChart2, pro: true },
   { href: "/musteri", label: "Müşteri", icon: Users, pro: true },
@@ -31,31 +35,62 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isAdmin, setIsAdmin] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [urgentCount, setUrgentCount] = useState(0);
+  const [pendingQCount, setPendingQCount] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user) {
-        setUserEmail(user.email ?? null);
-        setShopName(user.user_metadata?.shop_name ?? null);
+    let userId: string | null = null;
 
-        const [{ data: adminData }, { data: seller }] = await Promise.all([
-          supabase.from("admin_users").select("id").eq("id", user.id).single(),
-          supabase.from("sellers").select("onboarding_done").eq("id", user.id).single(),
-        ]);
-
-        setIsAdmin(!!adminData);
-        if (seller && !seller.onboarding_done) setShowOnboarding(true);
-
-        const { count } = await supabase
+    async function refreshBadges(uid: string) {
+      const [{ count: urgentReviews }, { count: pendingQuestions }] = await Promise.all([
+        supabase
           .from("reviews")
           .select("*", { count: "exact", head: true })
-          .eq("seller_id", user.id)
+          .eq("seller_id", uid)
           .eq("is_urgent", true)
-          .eq("is_replied", false);
-        setUrgentCount(count ?? 0);
-      }
+          .eq("is_replied", false),
+        supabase
+          .from("questions")
+          .select("*", { count: "exact", head: true })
+          .eq("seller_id", uid)
+          .eq("is_answered", false),
+      ]);
+      setUrgentCount(urgentReviews ?? 0);
+      setPendingQCount(pendingQuestions ?? 0);
+    }
+
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      userId = user.id;
+      setUserEmail(user.email ?? null);
+      setShopName(user.user_metadata?.shop_name ?? null);
+
+      const [{ data: adminData }, { data: seller }] = await Promise.all([
+        supabase.from("admin_users").select("id").eq("id", user.id).single(),
+        supabase.from("sellers").select("onboarding_done").eq("id", user.id).single(),
+      ]);
+      setIsAdmin(!!adminData);
+      if (seller && !seller.onboarding_done) setShowOnboarding(true);
+
+      await refreshBadges(user.id);
+
+      // Gerçek zamanlı badge güncellemesi
+      supabase
+        .channel(`badges:${user.id}`)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "reviews", filter: `seller_id=eq.${user.id}` },
+          () => refreshBadges(user.id))
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "reviews", filter: `seller_id=eq.${user.id}` },
+          () => refreshBadges(user.id))
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "questions", filter: `seller_id=eq.${user.id}` },
+          () => refreshBadges(user.id))
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "questions", filter: `seller_id=eq.${user.id}` },
+          () => refreshBadges(user.id))
+        .subscribe();
     });
+
+    return () => {
+      if (userId) supabase.removeChannel(supabase.channel(`badges:${userId}`));
+    };
   }, []);
 
   async function handleLogout() {
@@ -66,6 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
+    <ToastProvider>
     <div className="flex flex-col h-screen bg-gray-50 md:flex-row">
 
       {/* ── Mobil üst bar ─────────────────────────────── */}
@@ -109,11 +145,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <p className="text-[10px] text-gray-400 mt-0.5">AI Operasyon Asistanı</p>
               </div>
             </div>
-            <Link href="/yorumlar" className="relative p-1.5 text-gray-400 hover:text-orange-500 transition-colors" title="Acil yorumlar">
+            <Link href="/bildirimler" className="relative p-1.5 text-gray-400 hover:text-orange-500 transition-colors" title="Bildirimler">
               <Bell className="w-4 h-4" />
-              {urgentCount > 0 && (
+              {(urgentCount + pendingQCount) > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                  {urgentCount > 9 ? "9+" : urgentCount}
+                  {(urgentCount + pendingQCount) > 9 ? "9+" : urgentCount + pendingQCount}
                 </span>
               )}
             </Link>
@@ -124,6 +160,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {navItems.map(({ href, label, icon: Icon, pro }) => {
             const active = pathname === href;
+            const totalAlerts = urgentCount + pendingQCount;
+            const badge =
+              href === "/bildirimler" && totalAlerts > 0 ? totalAlerts :
+              href === "/sorular" && pendingQCount > 0 ? pendingQCount :
+              null;
             return (
               <Link
                 key={href}
@@ -137,7 +178,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <Icon className={clsx("w-4 h-4 flex-shrink-0", active ? "text-orange-500" : "text-gray-400")} />
                 {label}
-                {pro && (
+                {badge && (
+                  <span className="ml-auto text-[9px] bg-orange-500 text-white px-1.5 py-0.5 rounded-full font-bold min-w-[18px] text-center">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
+                {pro && !badge && (
                   <span className="ml-auto text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
                 )}
               </Link>
@@ -202,5 +248,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </nav>
 
     </div>
+    </ToastProvider>
   );
 }

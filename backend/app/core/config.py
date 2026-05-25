@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     # Trendyol API
     trendyol_api_url: str = "https://api.trendyol.com/sapigw"
 
+    # Credential encryption (must match CREDENTIAL_ENCRYPTION_KEY in frontend .env.local)
+    # Generate: openssl rand -hex 32
+    credential_encryption_key: str = ""
+
+    # Alerts webhook (Next.js /api/alerts endpoint)
+    app_url: str = "http://localhost:3000"
+    notify_secret: str = ""
+
     # Sentry
     sentry_dsn: str = ""  # optional
 

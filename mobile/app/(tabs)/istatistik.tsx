@@ -14,6 +14,7 @@ import { useTheme } from "@/lib/theme";
 
 interface Review { rating: number; created_at: string; is_replied: boolean; }
 interface Return { created_at: string; reason: string; }
+interface Order { ordered_at: string; total_price: number | null; }
 
 // Basit pie chart — 5 dilim (1-5 yıldız)
 function PieChart({ data, centerFill, textColor }: { data: { value: number; color: string }[]; centerFill: string; textColor: string }) {
@@ -75,18 +76,22 @@ export default function IstatistikScreen() {
   const t = useTheme();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [returns, setReturns] = useState<Return[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   async function load() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const [rRes, retRes] = await Promise.all([
+    const since8w = new Date(Date.now() - 56 * 86400000).toISOString();
+    const [rRes, retRes, ordRes] = await Promise.all([
       supabase.from("reviews").select("rating, created_at, is_replied").eq("seller_id", user.id),
       supabase.from("returns").select("created_at, reason").eq("seller_id", user.id),
+      supabase.from("orders").select("ordered_at, total_price").eq("seller_id", user.id).gte("ordered_at", since8w),
     ]);
     setReviews(rRes.data ?? []);
     setReturns(retRes.data ?? []);
+    setOrders(ordRes.data ?? []);
     setLoading(false);
   }
 
@@ -136,6 +141,30 @@ export default function IstatistikScreen() {
   const replied = reviews.filter((r) => r.is_replied).length;
   const replyRate = reviews.length ? Math.round((replied / reviews.length) * 100) : 0;
 
+  // 8 haftalık gelir verisi
+  const weeklyRevenue: { label: string; revenue: number; count: number }[] = [];
+  for (let i = 7; i >= 0; i--) {
+    const start = new Date(); start.setDate(start.getDate() - i * 7);
+    const end   = new Date(); end.setDate(end.getDate() - (i - 1) * 7);
+    const week = orders.filter((o) => {
+      const d = new Date(o.ordered_at);
+      return d >= start && d < end;
+    });
+    const revenue = week.reduce((s, o) => s + (o.total_price ?? 0), 0);
+    const weekNum = 8 - i;
+    weeklyRevenue.push({
+      label: i === 0 ? "Bu" : `H${weekNum}`,
+      revenue,
+      count: week.length,
+    });
+  }
+  const thisWeekRev  = weeklyRevenue[7].revenue;
+  const lastWeekRev  = weeklyRevenue[6].revenue;
+  const thisWeekOrders = weeklyRevenue[7].count;
+  const lastWeekOrders = weeklyRevenue[6].count;
+  const revDiff = lastWeekRev > 0 ? Math.round(((thisWeekRev - lastWeekRev) / lastWeekRev) * 100) : null;
+  const maxRev   = Math.max(...weeklyRevenue.map((w) => w.revenue), 1);
+
   // İade özeti (son 30 gün)
   const since30 = new Date(); since30.setDate(since30.getDate() - 30);
   const recentReturns = returns.filter((r) => new Date(r.created_at) >= since30).length;
@@ -154,6 +183,57 @@ export default function IstatistikScreen() {
         contentContainerStyle={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.orange} />}
       >
+        {/* Haftalık Gelir */}
+        <View style={[styles.card, { backgroundColor: t.card }]}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={[styles.cardTitle, { color: t.text }]}>Haftalık Gelir Trendi</Text>
+            <Text style={[styles.cardSub, { color: t.textMuted }]}>Son 8 hafta</Text>
+          </View>
+
+          {/* Bar chart */}
+          <View style={styles.barChart}>
+            {weeklyRevenue.map((w, i) => {
+              const barH = Math.max((w.revenue / maxRev) * 72, w.revenue > 0 ? 8 : 2);
+              const isThis = i === 7;
+              return (
+                <View key={i} style={styles.barCol}>
+                  <View style={styles.barWrapper}>
+                    <View style={[styles.bar, {
+                      height: barH,
+                      backgroundColor: isThis ? t.orange : (t.orange + "55"),
+                      borderRadius: 4,
+                    }]} />
+                  </View>
+                  <Text style={[styles.barLabel, { color: isThis ? t.orange : t.textMuted, fontWeight: isThis ? "800" : "400" }]}>{w.label}</Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Bu hafta vs geçen hafta */}
+          <View style={[styles.revCompare, { borderTopColor: t.border }]}>
+            <View style={styles.revSide}>
+              <Text style={[styles.revAmount, { color: t.text }]}>
+                {thisWeekRev.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
+              </Text>
+              <Text style={[styles.revLabel, { color: t.textMuted }]}>Bu hafta • {thisWeekOrders} sipariş</Text>
+            </View>
+            <View style={styles.revSide}>
+              <Text style={[styles.revAmount, { color: t.textSub }]}>
+                {lastWeekRev.toLocaleString("tr-TR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ₺
+              </Text>
+              <Text style={[styles.revLabel, { color: t.textMuted }]}>Geçen hafta • {lastWeekOrders} sipariş</Text>
+            </View>
+            {revDiff !== null && (
+              <View style={[styles.revBadge, { backgroundColor: revDiff >= 0 ? "#f0fdf4" : "#fef2f2" }]}>
+                <Text style={[styles.revBadgeText, { color: revDiff >= 0 ? "#16a34a" : "#dc2626" }]}>
+                  {revDiff >= 0 ? "+" : ""}{revDiff}%
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Yıldız dağılımı */}
         <View style={[styles.card, { backgroundColor: t.card }]}>
           <Text style={[styles.cardTitle, { color: t.text }]}>Yıldız Dağılımı</Text>
@@ -279,4 +359,15 @@ const styles = StyleSheet.create({
   returnStat: { flex: 1, borderRadius: 12, padding: 14, alignItems: "center" },
   returnStatValue: { fontSize: 22, fontWeight: "800", marginBottom: 4 },
   returnStatLabel: { fontSize: 11, fontWeight: "600" },
+  barChart: { flexDirection: "row", alignItems: "flex-end", height: 88, gap: 4, marginBottom: 16 },
+  barCol: { flex: 1, alignItems: "center", gap: 4 },
+  barWrapper: { height: 72, justifyContent: "flex-end", width: "100%" },
+  bar: { width: "100%" },
+  barLabel: { fontSize: 9 },
+  revCompare: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 12, borderTopWidth: 1 },
+  revSide: { flex: 1 },
+  revAmount: { fontSize: 15, fontWeight: "800" },
+  revLabel: { fontSize: 10, marginTop: 2 },
+  revBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  revBadgeText: { fontSize: 13, fontWeight: "800" },
 });

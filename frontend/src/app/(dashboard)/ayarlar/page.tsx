@@ -63,6 +63,13 @@ export default function AyarlarPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
+  const [sendingReport, setSendingReport] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<{ id: string; email: string; role: string; invited_at: string }[]>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"viewer" | "admin">("viewer");
+  const [inviting, setInviting] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -93,6 +100,8 @@ export default function AyarlarPage() {
           setReferralCode(code);
         }
       }
+      const { data: team } = await supabase.from("team_members").select("id, email, role, invited_at").eq("seller_id", user.id).order("invited_at");
+      setTeamMembers(team ?? []);
       setLoading(false);
     }
     load();
@@ -120,10 +129,43 @@ export default function AyarlarPage() {
     setTogglingKey(null);
   }
 
+  async function sendReportNow() {
+    setSendingReport(true);
+    try {
+      await fetch("/api/weekly-report", { method: "POST" });
+      setReportSent(true);
+      setTimeout(() => setReportSent(false), 5000);
+    } finally {
+      setSendingReport(false);
+    }
+  }
+
   function copyReferral() {
     navigator.clipboard.writeText(`https://saticipilot.com/beta?ref=${referralCode}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function inviteMember() {
+    if (!inviteEmail.trim() || !inviteEmail.includes("@")) return;
+    setInviting(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase.from("team_members").insert({
+        seller_id: user.id, email: inviteEmail.trim().toLowerCase(), role: inviteRole,
+      }).select().single();
+      if (!error && data) { setTeamMembers((p) => [...p, data]); setInviteEmail(""); }
+    } finally { setInviting(false); }
+  }
+
+  async function removeMember(id: string) {
+    setRemovingId(id);
+    const supabase = createClient();
+    await supabase.from("team_members").delete().eq("id", id);
+    setTeamMembers((p) => p.filter((m) => m.id !== id));
+    setRemovingId(null);
   }
 
   if (loading) {
@@ -235,18 +277,37 @@ export default function AyarlarPage() {
           </p>
           <div className="space-y-5">
             {TOGGLES.map((t) => (
-              <div key={t.key} className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800">{t.label}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{t.desc}</p>
+              <div key={t.key}>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800">{t.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{t.desc}</p>
+                  </div>
+                  <button
+                    onClick={() => toggleNotif(t.key, !notifs[t.key])}
+                    disabled={togglingKey === t.key}
+                    className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 ${notifs[t.key] ? "bg-orange-500" : "bg-gray-200"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifs[t.key] ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => toggleNotif(t.key, !notifs[t.key])}
-                  disabled={togglingKey === t.key}
-                  className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 ${notifs[t.key] ? "bg-orange-500" : "bg-gray-200"}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifs[t.key] ? "translate-x-5" : "translate-x-0"}`} />
-                </button>
+                {t.key === "notify_weekly_report" && (
+                  <div className="mt-2 flex items-center gap-3">
+                    <button
+                      onClick={sendReportNow}
+                      disabled={sendingReport}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                    >
+                      {sendingReport ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bell className="w-3 h-3" />}
+                      {sendingReport ? "Gönderiliyor…" : "Şimdi Gönder"}
+                    </button>
+                    {reportSent && (
+                      <span className="flex items-center gap-1 text-xs text-green-600">
+                        <CheckCircle className="w-3 h-3" /> Rapor gönderildi
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -353,18 +414,66 @@ export default function AyarlarPage() {
           </div>
           <p className="text-xs text-gray-400 mb-5">Mağazana erişimi olan kişileri yönet.</p>
 
-          <div className="flex flex-col items-center py-8 text-center gap-3">
-            <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-              <Settings2 className="w-6 h-6 text-gray-300" />
-            </div>
-            <p className="text-sm font-medium text-gray-700">Ekip yönetimi yakında</p>
-            <p className="text-xs text-gray-400 max-w-xs">Birden fazla kullanıcıyı aynı mağazaya bağlama özelliği Marketing planda aktif olacak.</p>
-            {plan !== "marketing" && (
-              <Link href="/fiyatlar" className="text-xs text-orange-600 font-semibold hover:underline">
-                Marketing plana geç →
-              </Link>
-            )}
+          {/* Davet formu */}
+          <div className="flex items-center gap-2 mb-5">
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && inviteMember()}
+              placeholder="ekip@ornek.com"
+              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"
+            />
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as "viewer" | "admin")}
+              className="border border-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none"
+            >
+              <option value="viewer">Görüntüleyici</option>
+              <option value="admin">Yönetici</option>
+            </select>
+            <button
+              onClick={inviteMember}
+              disabled={inviting || !inviteEmail.includes("@")}
+              className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {inviting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
+              Davet Et
+            </button>
           </div>
+
+          {/* Üye listesi */}
+          {teamMembers.length === 0 ? (
+            <div className="text-center py-6 text-gray-400 text-sm">Henüz ekip üyesi yok. Yukarıdan davet gönder.</div>
+          ) : (
+            <div className="space-y-2">
+              {teamMembers.map((m) => (
+                <div key={m.id} className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-orange-600">{m.email.slice(0, 2).toUpperCase()}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{m.email}</p>
+                      <p className="text-xs text-gray-400">{new Date(m.invited_at).toLocaleDateString("tr-TR")}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${m.role === "admin" ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-600"}`}>
+                      {m.role === "admin" ? "Yönetici" : "Görüntüleyici"}
+                    </span>
+                    <button
+                      onClick={() => removeMember(m.id)}
+                      disabled={removingId === m.id}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                    >
+                      {removingId === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Settings2 className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

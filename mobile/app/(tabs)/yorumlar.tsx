@@ -60,15 +60,6 @@ const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }>
   cevaplandi: { label: "Cevaplandı", color: "#059669", bg: "#d1fae5" },
 };
 
-function aiDraftReply(rating: number): string {
-  if (rating <= 2) {
-    return "Değerli müşterimiz, yaşadığınız olumsuz deneyim için içtenlikle özür dileriz. Bu durumu en kısa sürede düzeltmek için müşteri hizmetlerimiz sizinle iletişime geçecek. Güveninizi yeniden kazanmak için elimizden geleni yapacağız.";
-  }
-  if (rating === 3) {
-    return "Yorumunuz için teşekkür ederiz! Deneyiminizi daha iyi hale getirmek için geri bildirimlerinizi dikkate alıyoruz. Herhangi bir sorunuz olursa bize ulaşmaktan çekinmeyin. Sizi bir sonraki alışverişte daha memnun etmek dileğiyle!";
-  }
-  return "Harika yorumunuz için çok teşekkür ederiz! 🌟 Memnuniyetiniz bizim en büyük motivasyonumuz. Kaliteli ürünlerimiz ve hizmetimizle her zaman yanınızda olmaya devam edeceğiz. Sizi tekrar mağazamızda görmek dileğiyle!";
-}
 
 export default function YorumlarScreen() {
   const t = useTheme();
@@ -128,10 +119,36 @@ export default function YorumlarScreen() {
     if (!selected) return;
     Haptics.selectionAsync();
     setAiLoading(true);
-    await new Promise((r) => setTimeout(r, 1400));
-    setReply(aiDraftReply(selected.rating));
-    setAiLoading(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
+      const res = await fetch(`${apiUrl}/api/ai/draft-reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({
+          review_id: selected.id,
+          product_name: selected.product_name,
+          rating: selected.rating,
+          comment: selected.comment,
+          sentiment: null,
+        }),
+      });
+      const json = await res.json();
+      if (json.reply) {
+        setReply(json.reply);
+        setReviews((prev) =>
+          prev.map((r) => r.id === selected.id ? { ...r, suggested_reply: json.reply } : r)
+        );
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        Alert.alert("Hata", json.error ?? "AI yanıt üretilemedi.");
+      }
+    } catch {
+      Alert.alert("Hata", "Bağlantı hatası. İnternet bağlantını kontrol et.");
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function submitReply() {

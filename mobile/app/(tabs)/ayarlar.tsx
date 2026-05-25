@@ -68,6 +68,7 @@ export default function AyarlarScreen() {
   const [connectModal, setConnectModal] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [editNameModal, setEditNameModal] = useState(false);
   const [newShopName, setNewShopName] = useState("");
@@ -136,6 +137,29 @@ export default function AyarlarScreen() {
       Alert.alert("Hata", "Bağlantı kaydedilemedi. Lütfen tekrar dene.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleTestConnection(platformId: string) {
+    setTesting(platformId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
+      const res = await fetch(`${apiUrl}/api/trendyol/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.ok) {
+        Alert.alert("Bağlantı Başarılı ✓", json.message ?? "Trendyol API bağlantısı çalışıyor.");
+      } else {
+        Alert.alert("Bağlantı Hatası", json.error ?? "Bilinmeyen hata.");
+      }
+    } catch {
+      Alert.alert("Hata", "Test isteği gönderilemedi. İnternet bağlantını kontrol et.");
+    } finally {
+      setTesting(null);
     }
   }
 
@@ -273,19 +297,34 @@ export default function AyarlarScreen() {
                     <Text style={[styles.platformBadgeText, { color: t.textMuted }]}>Yakında</Text>
                   </View>
                 ) : conn ? (
-                  <TouchableOpacity
-                    style={[styles.platformBadge, { backgroundColor: "#d1fae5" }]}
-                    onPress={() => handleDisconnect(p.id)}
-                    disabled={disconnecting === p.id}
-                  >
-                    {disconnecting === p.id
-                      ? <ActivityIndicator size="small" color="#059669" />
-                      : <>
-                          <Ionicons name="checkmark-circle" size={13} color="#059669" />
-                          <Text style={[styles.platformBadgeText, { color: "#059669" }]}>Bağlı</Text>
-                        </>
-                    }
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", gap: 6 }}>
+                    <TouchableOpacity
+                      style={[styles.platformBadge, { backgroundColor: "#eff6ff" }]}
+                      onPress={() => handleTestConnection(p.id)}
+                      disabled={testing === p.id}
+                    >
+                      {testing === p.id
+                        ? <ActivityIndicator size="small" color="#3b82f6" />
+                        : <>
+                            <Ionicons name="flash-outline" size={13} color="#3b82f6" />
+                            <Text style={[styles.platformBadgeText, { color: "#3b82f6" }]}>Test</Text>
+                          </>
+                      }
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.platformBadge, { backgroundColor: "#d1fae5" }]}
+                      onPress={() => handleDisconnect(p.id)}
+                      disabled={disconnecting === p.id}
+                    >
+                      {disconnecting === p.id
+                        ? <ActivityIndicator size="small" color="#059669" />
+                        : <>
+                            <Ionicons name="checkmark-circle" size={13} color="#059669" />
+                            <Text style={[styles.platformBadgeText, { color: "#059669" }]}>Bağlı</Text>
+                          </>
+                      }
+                    </TouchableOpacity>
+                  </View>
                 ) : (
                   <TouchableOpacity
                     style={[styles.platformBadge, { backgroundColor: p.color + "18" }]}
