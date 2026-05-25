@@ -222,7 +222,7 @@ export default function BaglantiPage() {
   const [testResult, setTestResult] = useState<Record<string, { ok: boolean; message: string } | null>>({});
   const [userId, setUserId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ products: number; orders: number; reviews: number; questions: number; errors: string[] } | null>(null);
+  const [syncResult, setSyncResult] = useState<{ products: number; orders: number; reviews: number; questions: number; returns: number; errors: string[] } | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -311,10 +311,10 @@ export default function BaglantiPage() {
     try {
       const res = await fetch("/api/trendyol/sync", { method: "POST" });
       const data = await res.json();
-      setSyncResult({ products: data.products ?? 0, orders: data.orders ?? 0, reviews: data.reviews ?? 0, questions: data.questions ?? 0, errors: data.errors ?? [] });
+      setSyncResult({ products: data.products ?? 0, orders: data.orders ?? 0, reviews: data.reviews ?? 0, questions: data.questions ?? 0, returns: data.returns ?? 0, errors: data.errors ?? [] });
       if (data.syncedAt) setLastSyncedAt(data.syncedAt);
     } catch {
-      setSyncResult({ products: 0, orders: 0, reviews: 0, questions: 0, errors: ["Ağ hatası, tekrar deneyin"] });
+      setSyncResult({ products: 0, orders: 0, reviews: 0, questions: 0, returns: 0, errors: ["Ağ hatası, tekrar deneyin"] });
     } finally {
       setSyncing(false);
     }
@@ -442,7 +442,7 @@ export default function BaglantiPage() {
                         }
                         <div className="flex-1">
                           <span className={`font-medium ${syncResult.errors.length ? "text-amber-700" : "text-green-700"}`}>
-                            {syncResult.products} ürün · {syncResult.orders} sipariş · {syncResult.reviews} yorum · {syncResult.questions} soru
+                            {syncResult.products} ürün · {syncResult.orders} sipariş · {syncResult.reviews} yorum · {syncResult.questions} soru · {syncResult.returns} iade
                           </span>
                           {syncResult.errors.length > 0 && (
                             <div className="mt-0.5 space-y-0.5 text-amber-600">

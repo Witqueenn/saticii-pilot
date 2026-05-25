@@ -234,6 +234,95 @@ async function syncOrders(
   return { synced, errors };
 }
 
+// ── İade senkronizasyonu ─────────────────────────────────────────────────────
+
+interface TyClaim {
+  id?:                number | string;
+  claimId?:           number | string;
+  productId?:         number | string;
+  barcode?:           string;
+  productName?:       string;
+  productModelName?:  string;
+  claimReason?:       string;
+  returnReason?:      string;
+  claimReasonText?:   string;
+  reasonText?:        string;
+  customerFirstName?: string;
+  customerLastName?:  string;
+  createdDate?:       string;
+  returnDate?:        string;
+}
+
+const RETURN_REASON_MAP: Record<string, string> = {
+  SIZE_INCOMPATIBILITY:       "beden_uyumsuzlugu",
+  BEDEN_UYUMSUZLUGU:          "beden_uyumsuzlugu",
+  COLOR_DIFFERENCE:           "renk_farki",
+  RENK_FARKI:                 "renk_farki",
+  DOES_NOT_MATCH_DESCRIPTION: "renk_farki",
+  QUALITY_ISSUE:              "kalite_sorunu",
+  KALITE_SORUNU:              "kalite_sorunu",
+  WRONG_DELIVERY:             "yanlis_urun",
+  YANLIS_URUN:                "yanlis_urun",
+  DEFECTIVE:                  "hasarli",
+  DAMAGED:                    "hasarli",
+  HASARLI:                    "hasarli",
+};
+
+async function syncReturns(
+  db: SupabaseClient,
+  sellerId: string,
+  supplierId: string,
+  headers: Record<string, string>,
+): Promise<{ synced: number; errors: string[] }> {
+  const errors: string[] = [];
+  let synced = 0;
+  let page = 0;
+  const size = 100;
+
+  while (true) {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    const url = `${TY_BASE}/suppliers/${supplierId}/claims?${params}`;
+    let res: Response;
+    try {
+      res = await fetch(url, { headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
+    } catch (e) {
+      errors.push(`İade sayfa ${page} isteği başarısız: ${e}`);
+      break;
+    }
+    if (!res.ok) { errors.push(`İade API hatası: ${res.status} ${res.statusText}`); break; }
+
+    const body = await res.json() as { content: TyClaim[]; totalPages: number };
+    const items = body.content ?? [];
+    if (items.length === 0) break;
+
+    const rows = items.map((r) => {
+      const rawReason = String(r.claimReason ?? r.returnReason ?? "").toUpperCase();
+      const customerName = [r.customerFirstName, r.customerLastName].filter(Boolean).join(" ");
+      const comment = r.claimReasonText ?? r.reasonText ?? (customerName || null);
+      return {
+        seller_id:            sellerId,
+        marketplace:          "trendyol",
+        marketplace_return_id: String(r.id ?? r.claimId ?? ""),
+        product_id:           String(r.productId ?? r.barcode ?? ""),
+        product_name:         r.productName ?? r.productModelName ?? "",
+        reason:               RETURN_REASON_MAP[rawReason] ?? "diger",
+        customer_comment:     comment,
+        returned_at:          parseTyDate(r.createdDate ?? r.returnDate),
+      };
+    });
+
+    const { error } = await db.from("returns")
+      .upsert(rows, { onConflict: "seller_id,marketplace,marketplace_return_id", ignoreDuplicates: false });
+    if (error) errors.push(`İade kaydetme hatası: ${error.message}`);
+    else synced += rows.length;
+
+    if (page >= (body.totalPages ?? 1) - 1 || items.length < size) break;
+    page++;
+  }
+
+  return { synced, errors };
+}
+
 // ── Yorum senkronizasyonu ─────────────────────────────────────────────────────
 
 interface TyReview {
@@ -436,18 +525,20 @@ export async function POST(req: NextRequest) {
 
   const headers = tyHeaders(apiKey, apiSecret, supplierId);
 
-  const [productResult, orderResult, reviewResult, questionResult] = await Promise.all([
+  const [productResult, orderResult, reviewResult, questionResult, returnResult] = await Promise.all([
     syncProducts(db, user.id, supplierId, headers),
     syncOrders(db, user.id, supplierId, headers),
     syncReviews(db, user.id, supplierId, headers),
     syncQuestions(db, user.id, supplierId, headers),
+    syncReturns(db, user.id, supplierId, headers),
   ]);
 
   await db.from("sellers").update({ last_synced_at: new Date().toISOString() }).eq("id", user.id);
 
   const allErrors = [
     ...productResult.errors, ...orderResult.errors,
-    ...reviewResult.errors, ...questionResult.errors,
+    ...reviewResult.errors,  ...questionResult.errors,
+    ...returnResult.errors,
   ];
 
   return NextResponse.json({
@@ -456,6 +547,7 @@ export async function POST(req: NextRequest) {
     orders:    orderResult.synced,
     reviews:   reviewResult.synced,
     questions: questionResult.synced,
+    returns:   returnResult.synced,
     errors:    allErrors,
     syncedAt:  new Date().toISOString(),
   });
