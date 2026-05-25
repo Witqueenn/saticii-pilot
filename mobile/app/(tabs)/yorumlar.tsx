@@ -61,6 +61,15 @@ const STATUS_STYLE: Record<string, { label: string; color: string; bg: string }>
 };
 
 
+interface AnalysisResult {
+  totalAnalyzed: number;
+  sentiment: { positive: number; neutral: number; negative: number };
+  complaints: { topic: string; count: number; example: string }[];
+  praises:    { topic: string; count: number; example: string }[];
+  recommendations: string[];
+  summary: string;
+}
+
 export default function YorumlarScreen() {
   const t = useTheme();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -73,6 +82,9 @@ export default function YorumlarScreen() {
   const [reply, setReply] = useState("");
   const [replying, setReplying] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const { refresh: refreshBadges } = useBadges();
 
   async function load() {
@@ -113,6 +125,32 @@ export default function YorumlarScreen() {
     Haptics.selectionAsync();
     setSelected(r);
     setReply(r.suggested_reply ?? "");
+  }
+
+  async function runAnalysis() {
+    if (reviews.length === 0) return;
+    Haptics.selectionAsync();
+    setAnalysisLoading(true);
+    setShowAnalysis(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
+      const payload = reviews.slice(0, 60).map((r) => ({
+        rating: r.rating, comment: r.comment, product_name: r.product_name,
+      }));
+      const res = await fetch(`${apiUrl}/api/ai/review-analysis`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ reviews: payload }),
+      });
+      const json = await res.json();
+      if (!json.error) setAnalysis(json as AnalysisResult);
+      else Alert.alert("Hata", json.error);
+    } catch {
+      Alert.alert("Hata", "Bağlantı hatası.");
+    } finally {
+      setAnalysisLoading(false);
+    }
   }
 
   async function suggestAIReply() {
@@ -186,8 +224,22 @@ export default function YorumlarScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: t.headerBg, borderBottomColor: t.border }]}>
         <Text style={[styles.title, { color: t.text }]}>Yorumlar</Text>
-        <View style={[styles.countBadge, { backgroundColor: t.input }]}>
-          <Text style={[styles.countText, { color: t.textSub }]}>{filtered.length}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <View style={[styles.countBadge, { backgroundColor: t.input }]}>
+            <Text style={[styles.countText, { color: t.textSub }]}>{filtered.length}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.analyzeBtn, { backgroundColor: t.orange + "18", borderColor: t.orange + "50" }]}
+            onPress={runAnalysis}
+            disabled={analysisLoading || reviews.length === 0}
+            activeOpacity={0.75}
+          >
+            {analysisLoading
+              ? <ActivityIndicator size="small" color={t.orange} />
+              : <Ionicons name="analytics" size={15} color={t.orange} />
+            }
+            <Text style={[styles.analyzeBtnText, { color: t.orange }]}>Analiz</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -280,6 +332,122 @@ export default function YorumlarScreen() {
           </View>
         }
       />
+
+      {/* Analysis Modal */}
+      <Modal visible={showAnalysis} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAnalysis(false)}>
+        <SafeAreaView style={[styles.modalSafe, { backgroundColor: t.card }]} edges={["top"]}>
+          <View style={[styles.modalHeader, { borderBottomColor: t.border }]}>
+            <TouchableOpacity onPress={() => setShowAnalysis(false)} style={[styles.modalClose, { backgroundColor: t.input }]}>
+              <Ionicons name="close" size={22} color={t.textSub} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: t.text }]}>Yorum Analizi</Text>
+            <TouchableOpacity
+              onPress={runAnalysis}
+              disabled={analysisLoading}
+              style={[styles.modalClose, { backgroundColor: t.input }]}
+            >
+              <Ionicons name="refresh" size={18} color={analysisLoading ? t.textMuted : t.orange} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ flex: 1, padding: 20 }} contentContainerStyle={{ paddingBottom: 40 }}>
+            {analysisLoading ? (
+              <View style={{ alignItems: "center", paddingTop: 60, gap: 16 }}>
+                <ActivityIndicator size="large" color={t.orange} />
+                <Text style={{ color: t.textSub, fontSize: 14 }}>Yorumlar analiz ediliyor…</Text>
+              </View>
+            ) : analysis ? (
+              <>
+                <Text style={{ color: t.textSub, fontSize: 13, marginBottom: 16 }}>
+                  {analysis.totalAnalyzed} yorum analiz edildi
+                </Text>
+
+                {/* Özet */}
+                <View style={{ backgroundColor: t.bg, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+                  <Text style={{ color: t.text, fontSize: 14, lineHeight: 21 }}>{analysis.summary}</Text>
+                </View>
+
+                {/* Sentiment bar */}
+                <View style={{ backgroundColor: t.bg, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+                  <Text style={{ color: t.text, fontWeight: "700", fontSize: 13, marginBottom: 12 }}>Duygu Dağılımı</Text>
+                  {[
+                    { label: "Olumlu", count: analysis.sentiment.positive, color: "#10b981" },
+                    { label: "Nötr",   count: analysis.sentiment.neutral,  color: "#6b7280" },
+                    { label: "Olumsuz",count: analysis.sentiment.negative, color: "#ef4444" },
+                  ].map((s) => {
+                    const total = analysis.sentiment.positive + analysis.sentiment.neutral + analysis.sentiment.negative;
+                    const pct = total > 0 ? Math.round((s.count / total) * 100) : 0;
+                    return (
+                      <View key={s.label} style={{ marginBottom: 10 }}>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                          <Text style={{ color: t.textSub, fontSize: 12 }}>{s.label}</Text>
+                          <Text style={{ color: t.textSub, fontSize: 12 }}>{s.count} ({pct}%)</Text>
+                        </View>
+                        <View style={{ height: 6, backgroundColor: t.border, borderRadius: 3 }}>
+                          <View style={{ height: 6, width: `${pct}%`, backgroundColor: s.color, borderRadius: 3 }} />
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Şikayetler */}
+                {analysis.complaints.length > 0 && (
+                  <View style={{ backgroundColor: t.bg, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+                    <Text style={{ color: "#ef4444", fontWeight: "700", fontSize: 13, marginBottom: 10 }}>
+                      Öne Çıkan Şikayetler
+                    </Text>
+                    {analysis.complaints.map((c, i) => (
+                      <View key={i} style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#fee2e2", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                          <Text style={{ color: "#ef4444", fontSize: 11, fontWeight: "800" }}>{c.count}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: t.text, fontSize: 13, fontWeight: "600" }}>{c.topic}</Text>
+                          <Text style={{ color: t.textMuted, fontSize: 12, marginTop: 2, fontStyle: "italic" }}>"{c.example}"</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Övgüler */}
+                {analysis.praises.length > 0 && (
+                  <View style={{ backgroundColor: t.bg, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+                    <Text style={{ color: "#10b981", fontWeight: "700", fontSize: 13, marginBottom: 10 }}>
+                      Öne Çıkan Övgüler
+                    </Text>
+                    {analysis.praises.map((p, i) => (
+                      <View key={i} style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
+                        <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "#d1fae5", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                          <Text style={{ color: "#10b981", fontSize: 11, fontWeight: "800" }}>{p.count}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: t.text, fontSize: 13, fontWeight: "600" }}>{p.topic}</Text>
+                          <Text style={{ color: t.textMuted, fontSize: 12, marginTop: 2, fontStyle: "italic" }}>"{p.example}"</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Öneriler */}
+                <View style={{ backgroundColor: t.bg, borderRadius: 14, padding: 16 }}>
+                  <Text style={{ color: t.orange, fontWeight: "700", fontSize: 13, marginBottom: 10 }}>
+                    Aksiyon Önerileri
+                  </Text>
+                  {analysis.recommendations.map((rec, i) => (
+                    <View key={i} style={{ flexDirection: "row", gap: 10, marginBottom: 8 }}>
+                      <Text style={{ color: t.orange, fontWeight: "700", fontSize: 13 }}>{i + 1}.</Text>
+                      <Text style={{ color: t.textSub, fontSize: 13, flex: 1, lineHeight: 19 }}>{rec}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            ) : null}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
 
       {/* Detail Modal */}
       <Modal visible={!!selected} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelected(null)}>
@@ -454,6 +622,8 @@ const styles = StyleSheet.create({
   templatesRow: { marginBottom: 4 },
   templateBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   templateBtnText: { fontSize: 13, fontWeight: "600" },
+  analyzeBtn: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5 },
+  analyzeBtnText: { fontSize: 13, fontWeight: "700" },
   aiBtn: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16 },
   aiBtnText: { flex: 1, fontSize: 14, fontWeight: "700" },
   proBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },

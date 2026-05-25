@@ -53,6 +53,35 @@ interface TyProduct {
   images?: { url: string }[];
 }
 
+function calcDescriptionScore(desc: string | null | undefined): number {
+  if (!desc?.trim()) return 0;
+  const d = desc.trim();
+  let score = 20;
+  if (d.length > 80)  score += 15;
+  if (d.length > 250) score += 15;
+  if (d.length > 600) score += 10;
+  if (/\d/.test(d)) score += 10;
+  if (d.split(/[.!?\n]/).filter(Boolean).length > 2) score += 10;
+  if (/(cm|mm|gr|kg|ml|lt|adet|renk|beden|numara)/i.test(d)) score += 10;
+  if (!/[A-ZÜĞŞÇÖİ]{6,}/.test(d)) score += 10;
+  return Math.min(100, score);
+}
+
+function calcSeoScore(title: string): number {
+  if (!title?.trim()) return 0;
+  const t = title.trim();
+  let score = 10;
+  if (t.length >= 25) score += 15;
+  if (t.length >= 50) score += 10;
+  if (t.length >= 70 && t.length <= 130) score += 10;
+  if (/\d/.test(t)) score += 10;
+  if (t.split(/\s+/).length >= 4) score += 15;
+  if (t.split(/\s+/).length >= 7) score += 10;
+  if (!/[A-ZÜĞŞÇÖİ]{6,}/.test(t)) score += 10;
+  if (!(/[!?]{2,}/.test(t))) score += 10;
+  return Math.min(100, score);
+}
+
 async function syncProducts(
   db: SupabaseClient,
   sellerId: string,
@@ -91,8 +120,8 @@ async function syncProducts(
         stock:            p.quantity ?? 0,
         description:      p.description ?? null,
         marketplace:      "trendyol",
-        description_score: 50,
-        seo_score:         50,
+        description_score: calcDescriptionScore(p.description),
+        seo_score:         calcSeoScore(p.title),
       }));
 
       const { error } = await db.from("products")
