@@ -552,6 +552,53 @@ export async function POST(req: NextRequest) {
   });
 }
 
+// ── Expo push notification ────────────────────────────────────────────────────
+
+async function sendPush(token: string, title: string, body: string) {
+  try {
+    await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ to: token, title, body, sound: "default", badge: 1 }),
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch { /* push is best-effort */ }
+}
+
+async function maybePushAlerts(db: SupabaseClient, sellerId: string) {
+  const { data: seller } = await db
+    .from("sellers")
+    .select("push_token")
+    .eq("id", sellerId)
+    .single();
+  if (!seller?.push_token) return;
+
+  const since = new Date(Date.now() - 25 * 3600 * 1000).toISOString();
+
+  const [{ count: urgentReviews }, { count: pendingQuestions }] = await Promise.all([
+    db.from("reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", sellerId)
+      .eq("is_urgent", true)
+      .eq("is_replied", false)
+      .gte("reviewed_at", since),
+    db.from("questions")
+      .select("id", { count: "exact", head: true })
+      .eq("seller_id", sellerId)
+      .eq("is_answered", false)
+      .gte("asked_at", since),
+  ]);
+
+  const total = (urgentReviews ?? 0) + (pendingQuestions ?? 0);
+  if (total === 0) return;
+
+  const parts: string[] = [];
+  if ((urgentReviews ?? 0) > 0) parts.push(`${urgentReviews} acil yorum`);
+  if ((pendingQuestions ?? 0) > 0) parts.push(`${pendingQuestions} yeni soru`);
+
+  await sendPush(seller.push_token, "SatıcıPilot — Aksiyon Gerekiyor", parts.join(", ") + " bekliyor");
+}
+
 // ── Cron handler (GET) ────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -608,6 +655,8 @@ export async function GET(req: NextRequest) {
       await db.from("sellers")
         .update({ last_synced_at: new Date().toISOString() })
         .eq("id", cred.seller_id);
+
+      await maybePushAlerts(db, cred.seller_id);
 
       results.push({
         seller_id: cred.seller_id,

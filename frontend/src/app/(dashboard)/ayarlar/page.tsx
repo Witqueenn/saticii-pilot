@@ -23,11 +23,12 @@ const planFeatures: Record<string, string[]> = {
 };
 
 interface Toggle {
-  key: "notify_urgent_reviews" | "notify_weekly_report" | "notify_new_returns" | "notify_low_stock";
+  key: "notify_urgent_reviews" | "notify_weekly_report" | "notify_new_returns" | "notify_low_stock" | "notify_daily_digest";
   label: string;
   desc: string;
 }
 const TOGGLES: Toggle[] = [
+  { key: "notify_daily_digest", label: "Günlük özet", desc: "Her sabah 08:00'de günün özetini al (acil yorumlar, sorular, iadeler)" },
   { key: "notify_urgent_reviews", label: "Acil yorum bildirimi", desc: "1 yıldız yorum geldiğinde anında e-posta al" },
   { key: "notify_weekly_report", label: "Haftalık rapor", desc: "Her pazartesi haftalık özet e-postası al" },
   { key: "notify_new_returns", label: "Yeni iade bildirimi", desc: "Yeni iade talebi oluştuğunda e-posta al" },
@@ -54,6 +55,7 @@ export default function AyarlarPage() {
   const [referralCount, setReferralCount] = useState(0);
   const [copied, setCopied] = useState(false);
   const [notifs, setNotifs] = useState<NotifState>({
+    notify_daily_digest: true,
     notify_urgent_reviews: true,
     notify_weekly_report: true,
     notify_new_returns: false,
@@ -65,6 +67,8 @@ export default function AyarlarPage() {
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
   const [sendingReport, setSendingReport] = useState(false);
   const [reportSent, setReportSent] = useState(false);
+  const [sendingDigest, setSendingDigest] = useState(false);
+  const [digestSent, setDigestSent] = useState(false);
   const [teamMembers, setTeamMembers] = useState<{ id: string; email: string; role: string; invited_at: string }[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"viewer" | "admin">("viewer");
@@ -80,12 +84,13 @@ export default function AyarlarPage() {
       setShopName(user.user_metadata?.shop_name ?? "");
       const { data: seller } = await supabase
         .from("sellers")
-        .select("plan, notify_urgent_reviews, notify_weekly_report, notify_new_returns, notify_low_stock, phone, referral_code, referral_count")
+        .select("plan, notify_daily_digest, notify_urgent_reviews, notify_weekly_report, notify_new_returns, notify_low_stock, phone, referral_code, referral_count")
         .eq("id", user.id).single();
       if (seller) {
         setPlan(seller.plan ?? "temel");
         setPhone(seller.phone ?? "");
         setNotifs({
+          notify_daily_digest: seller.notify_daily_digest ?? true,
           notify_urgent_reviews: seller.notify_urgent_reviews ?? true,
           notify_weekly_report: seller.notify_weekly_report ?? true,
           notify_new_returns: seller.notify_new_returns ?? false,
@@ -137,6 +142,17 @@ export default function AyarlarPage() {
       setTimeout(() => setReportSent(false), 5000);
     } finally {
       setSendingReport(false);
+    }
+  }
+
+  async function sendDigestNow() {
+    setSendingDigest(true);
+    try {
+      await fetch("/api/daily-digest", { method: "POST" });
+      setDigestSent(true);
+      setTimeout(() => setDigestSent(false), 5000);
+    } finally {
+      setSendingDigest(false);
     }
   }
 
@@ -291,6 +307,23 @@ export default function AyarlarPage() {
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${notifs[t.key] ? "translate-x-5" : "translate-x-0"}`} />
                   </button>
                 </div>
+                {t.key === "notify_daily_digest" && (
+                  <div className="mt-2 flex items-center gap-3">
+                    <button
+                      onClick={sendDigestNow}
+                      disabled={sendingDigest}
+                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                    >
+                      {sendingDigest ? <Loader2 className="w-3 h-3 animate-spin" /> : <Bell className="w-3 h-3" />}
+                      {sendingDigest ? "Gönderiliyor…" : "Şimdi Gönder"}
+                    </button>
+                    {digestSent && (
+                      <span className="flex items-center gap-1 text-xs text-green-600">
+                        <CheckCircle className="w-3 h-3" /> Özet gönderildi
+                      </span>
+                    )}
+                  </div>
+                )}
                 {t.key === "notify_weekly_report" && (
                   <div className="mt-2 flex items-center gap-3">
                     <button

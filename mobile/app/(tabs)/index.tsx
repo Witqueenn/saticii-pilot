@@ -23,6 +23,7 @@ import { useRealtimeReviews, useRealtimeReturns } from "@/lib/useRealtime";
 import { useBadges } from "@/lib/BadgeContext";
 import { SearchModal } from "@/lib/SearchModal";
 import { useTheme } from "@/lib/theme";
+import { setupNotificationHandler, registerForPushTokenAsync } from "@/lib/notifications";
 
 interface KPI {
   label: string;
@@ -218,7 +219,11 @@ export default function DashboardScreen() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    setupNotificationHandler();
+    registerForPushTokenAsync();
+  }, []);
 
   async function onRefresh() {
     setRefreshing(true);

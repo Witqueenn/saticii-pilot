@@ -7,13 +7,11 @@ function generateNonce(): string {
   return btoa(String.fromCharCode(...array));
 }
 
-function buildCsp(nonce: string): string {
+function buildCsp(_nonce: string): string {
   return [
     "default-src 'self'",
-    // nonce whitelists Next.js bootstrap + our scripts; strict-dynamic lets
-    // those scripts load further chunks without needing per-URL allowlisting
-    `script-src 'nonce-${nonce}' 'strict-dynamic'`,
-    // unsafe-inline kept for Next.js critical CSS injection (font optimization)
+    // 'unsafe-inline' required for Next.js inline bootstrap scripts
+    "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https:",
     "font-src 'self' data:",
@@ -64,6 +62,7 @@ export async function middleware(request: NextRequest) {
     isAuthPage ||
     pathname.startsWith("/auth") ||
     pathname === "/sifre-sifirla" ||
+    pathname === "/sifremi-unuttum" ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/blog");
   const isProtected = !isPublic;

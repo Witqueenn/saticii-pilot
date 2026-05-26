@@ -2,12 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2 } from "lucide-react";
 
 export default function GirisPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -18,17 +16,28 @@ export default function GirisPage() {
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      setError("E-posta veya şifre hatalı.");
+      if (authError) {
+        if (authError.message === "Email not confirmed") {
+          setError("E-postanı doğrulamadan giriş yapamazsın. Gelen kutunu kontrol et.");
+        } else if (authError.message?.includes("Invalid login credentials")) {
+          setError("E-posta veya şifre hatalı.");
+        } else {
+          setError(authError.message || "Giriş yapılamadı. Tekrar dene.");
+        }
+        return;
+      }
+
+      // Full page reload ensures middleware sees the fresh session cookie.
+      window.location.href = "/genel";
+    } catch (err) {
+      setError(`Bağlantı hatası: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.push("/genel");
-    router.refresh();
   }
 
   return (

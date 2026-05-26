@@ -129,6 +129,74 @@ function returnRateHtml(shopName: string, products: { name: string; return_rate:
 </html>`;
 }
 
+export async function GET(req: NextRequest) {
+  const auth = req.headers.get("authorization");
+  if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const supabase = getSupabase();
+  const dashboardUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saticii-pilot.vercel.app";
+  const resend = getResend();
+
+  const { data: sellers } = await supabase
+    .from("sellers")
+    .select("id, email, shop_name, notify_low_stock, notify_new_returns")
+    .or("notify_low_stock.eq.true,notify_new_returns.eq.true");
+
+  if (!sellers?.length) return NextResponse.json({ checked: 0 });
+
+  const results: { seller_id: string; low_stock?: number; high_return?: number }[] = [];
+
+  for (const seller of sellers) {
+    if (!seller.email) continue;
+    const toEmail = process.env.RESEND_TO_EMAIL ?? seller.email;
+
+    if (seller.notify_low_stock) {
+      const { data: low } = await supabase
+        .from("products")
+        .select("name, stock")
+        .eq("seller_id", seller.id)
+        .lte("stock", 5)
+        .gte("stock", 0);
+
+      if (low?.length) {
+        await resend.emails.send({
+          from: "SatıcıPilot <onboarding@resend.dev>",
+          to: toEmail,
+          subject: `⚠️ ${low.length} ürünün stoğu kritik — ${seller.shop_name}`,
+          html: lowStockHtml(seller.shop_name, low, `${dashboardUrl}/urunler`),
+        });
+        results.push({ seller_id: seller.id, low_stock: low.length });
+      }
+    }
+
+    if (seller.notify_new_returns) {
+      const { data: highReturn } = await supabase
+        .from("products")
+        .select("name, return_rate")
+        .eq("seller_id", seller.id)
+        .gt("return_rate", 20);
+
+      if (highReturn?.length) {
+        const mapped = highReturn.map((p) => ({
+          name: p.name,
+          return_rate: Math.round((p.return_rate as number) ?? 0),
+        }));
+        await resend.emails.send({
+          from: "SatıcıPilot <onboarding@resend.dev>",
+          to: toEmail,
+          subject: `📦 Yüksek iade oranı uyarısı — ${seller.shop_name}`,
+          html: returnRateHtml(seller.shop_name, mapped, `${dashboardUrl}/urunler`),
+        });
+        results.push({ seller_id: seller.id, high_return: highReturn.length });
+      }
+    }
+  }
+
+  return NextResponse.json({ checked: sellers.length, results });
+}
+
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-webhook-secret");
   if (!process.env.NOTIFY_SECRET || secret !== process.env.NOTIFY_SECRET) {

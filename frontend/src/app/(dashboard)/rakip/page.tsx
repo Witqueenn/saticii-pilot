@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { TrendingDown, TrendingUp, Minus, RefreshCw, ChevronDown, ChevronUp, Plus, X, Sparkles, Loader2 } from "lucide-react";
+import { TrendingDown, TrendingUp, Minus, RefreshCw, ChevronDown, ChevronUp, Plus, X, Sparkles, Loader2, Search, CheckCircle } from "lucide-react";
 import { clsx } from "clsx";
 import ProGate from "@/components/ProGate";
 import { useToast } from "@/components/Toast";
@@ -83,6 +83,21 @@ const STATUS_CONFIG = {
   },
 };
 
+interface SearchResult {
+  id: string;
+  name: string;
+  brand: string;
+  price: number;
+  seller: string;
+  rating: number | null;
+}
+
+interface SearchForm {
+  ourProduct: string;
+  ourPrice: string;
+  query: string;
+}
+
 interface AddForm {
   our_product_name: string;
   our_price: string;
@@ -110,6 +125,12 @@ export default function RakipPage() {
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState<string | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<Record<string, string>>({});
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchForm, setSearchForm] = useState<SearchForm>({ ourProduct: "", ourPrice: "", query: "" });
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [addingSearch, setAddingSearch] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -201,6 +222,71 @@ export default function RakipPage() {
     }
   }
 
+  async function searchCompetitors() {
+    if (!searchForm.query.trim()) return;
+    setSearching(true);
+    setSearchResults([]);
+    setSelectedIds(new Set());
+    try {
+      const res = await fetch("/api/trendyol/competitor-search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: searchForm.query.trim() }),
+      });
+      const data = await res.json();
+      if (data.products) setSearchResults(data.products);
+      else toast(data.error ?? "Arama başarısız", "error");
+    } catch {
+      toast("Bağlantı hatası", "error");
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function addSearchResults() {
+    if (selectedIds.size === 0 || !searchForm.ourProduct.trim() || !searchForm.ourPrice) return;
+    const ourPrice = parseFloat(searchForm.ourPrice);
+    if (isNaN(ourPrice)) { toast("Geçerli bir fiyat gir", "error"); return; }
+    setAddingSearch(true);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const rows = searchResults
+        .filter((r) => selectedIds.has(r.id))
+        .map((r) => ({
+          seller_id:              user.id,
+          our_product_id:         searchForm.ourProduct.toLowerCase().replace(/\s+/g, "-"),
+          our_product_name:       searchForm.ourProduct,
+          our_price:              ourPrice,
+          competitor_name:        r.seller || r.brand || "Trendyol",
+          competitor_product_name: r.name,
+          competitor_price:       r.price,
+          category:               null,
+          checked_at:             new Date().toISOString(),
+        }));
+      await supabase.from("competitor_prices").insert(rows);
+      toast(`${rows.length} rakip eklendi`);
+      setShowSearch(false);
+      setSearchForm({ ourProduct: "", ourPrice: "", query: "" });
+      setSearchResults([]);
+      setSelectedIds(new Set());
+      window.location.reload();
+    } catch {
+      toast("Kaydetme başarısız", "error");
+    } finally {
+      setAddingSearch(false);
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
   async function aiAnalyze(p: ProductSummary) {
     setAiLoading(p.productId);
     try {
@@ -265,10 +351,16 @@ export default function RakipPage() {
             </div>
           )}
           <button
+            onClick={() => setShowSearch(true)}
+            className="flex items-center gap-1.5 text-sm bg-white border border-gray-200 hover:border-orange-300 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors"
+          >
+            <Search className="w-4 h-4" /> Otomatik Ara
+          </button>
+          <button
             onClick={() => setShowAdd(true)}
             className="flex items-center gap-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium transition-colors"
           >
-            <Plus className="w-4 h-4" /> Rakip Ekle
+            <Plus className="w-4 h-4" /> Manuel Ekle
           </button>
         </div>
       </div>
@@ -465,6 +557,130 @@ export default function RakipPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Otomatik Arama Modalı ─────────────────────── */}
+      {showSearch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 flex-shrink-0">
+              <div>
+                <h3 className="font-semibold text-gray-900">Trendyol&apos;da Rakip Ara</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Arama sonuçlarından rakip seç, otomatik ekle</p>
+              </div>
+              <button onClick={() => { setShowSearch(false); setSearchResults([]); }} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 flex-shrink-0">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ürün adın *</label>
+                  <input
+                    value={searchForm.ourProduct}
+                    onChange={(e) => setSearchForm((f) => ({
+                      ...f, ourProduct: e.target.value,
+                      query: f.query || e.target.value,
+                    }))}
+                    placeholder="Floral Bluz"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Senin fiyatın (₺) *</label>
+                  <input
+                    type="number"
+                    value={searchForm.ourPrice}
+                    onChange={(e) => setSearchForm((f) => ({ ...f, ourPrice: e.target.value }))}
+                    placeholder="299"
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={searchForm.query}
+                  onChange={(e) => setSearchForm((f) => ({ ...f, query: e.target.value }))}
+                  onKeyDown={(e) => e.key === "Enter" && searchCompetitors()}
+                  placeholder="Trendyol arama terimi (ör: kadın bluz floral)"
+                  className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                />
+                <button
+                  onClick={searchCompetitors}
+                  disabled={searching || !searchForm.query.trim()}
+                  className="flex items-center gap-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-60 transition-colors"
+                >
+                  {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Ara
+                </button>
+              </div>
+            </div>
+
+            {/* Results */}
+            {searchResults.length > 0 && (
+              <div className="flex-1 overflow-y-auto border-t border-gray-100">
+                <div className="px-6 py-3 bg-gray-50 flex items-center justify-between border-b border-gray-100">
+                  <p className="text-xs text-gray-500">{searchResults.length} sonuç · {selectedIds.size} seçili</p>
+                  <button
+                    onClick={() => setSelectedIds(selectedIds.size === searchResults.length ? new Set() : new Set(searchResults.map((r) => r.id)))}
+                    className="text-xs text-orange-600 font-medium hover:underline"
+                  >
+                    {selectedIds.size === searchResults.length ? "Tümünü kaldır" : "Tümünü seç"}
+                  </button>
+                </div>
+                <div className="divide-y divide-gray-50">
+                  {searchResults.map((r) => {
+                    const selected = selectedIds.has(r.id);
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => toggleSelect(r.id)}
+                        className={clsx(
+                          "w-full text-left px-6 py-3 flex items-center gap-3 transition-colors",
+                          selected ? "bg-orange-50" : "hover:bg-gray-50"
+                        )}
+                      >
+                        <div className={clsx("w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors", selected ? "bg-orange-500 border-orange-500" : "border-gray-300")}>
+                          {selected && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{r.name}</p>
+                          <p className="text-xs text-gray-400 truncate">{r.seller}{r.brand && r.brand !== r.seller ? ` · ${r.brand}` : ""}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm font-bold text-gray-900">₺{fmt(r.price)}</p>
+                          {r.rating != null && <p className="text-xs text-gray-400">★ {r.rating.toFixed(1)}</p>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {searching && (
+              <div className="flex-1 flex items-center justify-center py-8 border-t border-gray-100">
+                <div className="flex items-center gap-2 text-gray-400 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Trendyol&apos;da aranıyor…
+                </div>
+              </div>
+            )}
+
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 flex-shrink-0">
+              <button onClick={() => { setShowSearch(false); setSearchResults([]); }} className="text-sm text-gray-500 px-4 py-2 hover:bg-gray-50 rounded-lg transition-colors">
+                İptal
+              </button>
+              <button
+                onClick={addSearchResults}
+                disabled={selectedIds.size === 0 || !searchForm.ourProduct.trim() || !searchForm.ourPrice || addingSearch}
+                className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-lg font-medium transition-colors disabled:opacity-60 flex items-center gap-2"
+              >
+                {addingSearch && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {selectedIds.size > 0 ? `${selectedIds.size} Rakip Ekle` : "Rakip Seç"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

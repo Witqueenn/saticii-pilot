@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { supabase } from "./supabase";
 
 const isExpoGo = Constants.appOwnership === "expo";
 
@@ -38,4 +39,31 @@ export async function scheduleLocalNotification(title: string, body: string) {
       trigger: null,
     });
   } catch {}
+}
+
+export async function registerForPushTokenAsync() {
+  if (isExpoGo) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const N = require("expo-notifications");
+
+    const { status: existing } = await N.getPermissionsAsync();
+    let finalStatus = existing;
+    if (existing !== "granted") {
+      const { status } = await N.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") return;
+
+    const tokenData = await N.getExpoPushTokenAsync();
+    const token: string = tokenData.data;
+    if (!token) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("sellers").update({ push_token: token }).eq("id", user.id);
+    }
+  } catch {
+    // Silent — push tokens optional
+  }
 }
