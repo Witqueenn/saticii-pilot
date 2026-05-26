@@ -193,17 +193,26 @@ export default function YorumlarScreen() {
     if (!selected || !reply.trim()) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setReplying(true);
-    await supabase
-      .from("reviews")
-      .update({ suggested_reply: reply.trim(), is_replied: true })
-      .eq("id", selected.id);
-    setReviews((prev) =>
-      prev.map((r) => r.id === selected.id ? { ...r, suggested_reply: reply.trim(), is_replied: true } : r)
-    );
-    setReplying(false);
-    setSelected(null);
-    refreshBadges();
-    Alert.alert("Yanıt gönderildi ✓");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
+      const res = await fetch(`${apiUrl}/api/trendyol/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ review_id: selected.id, reply_text: reply.trim() }),
+      });
+      const json = await res.json();
+      setReviews((prev) =>
+        prev.map((r) => r.id === selected.id ? { ...r, suggested_reply: reply.trim(), is_replied: true } : r)
+      );
+      refreshBadges();
+      Alert.alert(json.trendyol_ok ? "Trendyol'a gönderildi ✓" : (json.message ?? "Yanıt kaydedildi"));
+    } catch {
+      Alert.alert("Hata", "Bağlantı hatası. Tekrar dene.");
+    } finally {
+      setReplying(false);
+      setSelected(null);
+    }
   }
 
   if (loading) {

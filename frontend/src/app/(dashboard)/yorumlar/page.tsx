@@ -200,6 +200,8 @@ export default function YorumlarPage() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>("tumu");
   const [drafting, setDrafting] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
+  const [sendResult, setSendResult] = useState<Record<string, { trendyol_ok: boolean; message: string }>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [editingReply, setEditingReply] = useState<Record<string, string>>({});
 
@@ -254,6 +256,25 @@ export default function YorumlarPage() {
       if (!data.error) setAnalysis(data as AnalysisResult);
     } finally {
       setAnalysisLoading(false);
+    }
+  }
+
+  async function sendReply(r: Review) {
+    const replyText = getReplyText(r);
+    if (!replyText.trim()) return;
+    setSending(r.id);
+    try {
+      const res = await fetch("/api/trendyol/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_id: r.id, reply_text: replyText }),
+      });
+      const data = await res.json();
+      setReviews((prev) => prev.map((rev) => rev.id === r.id ? { ...rev, is_replied: true, suggested_reply: replyText } : rev));
+      setSendResult((prev) => ({ ...prev, [r.id]: { trendyol_ok: !!data.trendyol_ok, message: data.message ?? "" } }));
+      toast(data.trendyol_ok ? "Trendyol'a gönderildi ✓" : (data.message ?? "Yanıt kaydedildi"));
+    } finally {
+      setSending(null);
     }
   }
 
@@ -617,10 +638,12 @@ export default function YorumlarPage() {
                   />
                   <div className="flex gap-2 flex-wrap items-center">
                     <button
-                      onClick={() => markReplied(r.id)}
-                      className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-colors"
+                      onClick={() => sendReply(r)}
+                      disabled={sending === r.id || !getReplyText(r).trim()}
+                      className="text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-1 disabled:opacity-60"
                     >
-                      ✓ Cevapladım
+                      {sending === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                      {sending === r.id ? "Gönderiliyor…" : "Trendyol'a Gönder"}
                     </button>
                     <button
                       onClick={() => copyToClipboard(r.id, getReplyText(r))}
@@ -644,6 +667,11 @@ export default function YorumlarPage() {
                       }}
                     />
                   </div>
+                  {sendResult[r.id] && (
+                    <p className={`text-xs mt-1 ${sendResult[r.id].trendyol_ok ? "text-green-600" : "text-amber-600"}`}>
+                      {sendResult[r.id].message}
+                    </p>
+                  )}
                 </div>
               )}
 

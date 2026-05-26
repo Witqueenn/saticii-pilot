@@ -32,6 +32,8 @@ export default function SorularPage() {
   const [activeFilter, setActiveFilter] = useState<FilterType>("tumu");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [drafting, setDrafting] = useState<string | null>(null);
+  const [sending, setSending] = useState<string | null>(null);
+  const [sendResult, setSendResult] = useState<Record<string, { trendyol_ok: boolean; message: string }>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [editingAnswer, setEditingAnswer] = useState<Record<string, string>>({});
 
@@ -71,6 +73,24 @@ export default function SorularPage() {
       }
     } finally {
       setDrafting(null);
+    }
+  }
+
+  async function sendAnswer(q: Question) {
+    const answerText = getAnswerText(q);
+    if (!answerText.trim()) return;
+    setSending(q.id);
+    try {
+      const res = await fetch("/api/trendyol/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question_id: q.id, answer_text: answerText }),
+      });
+      const data = await res.json();
+      setQuestions((prev) => prev.map((item) => item.id === q.id ? { ...item, is_answered: true, suggested_answer: answerText } : item));
+      setSendResult((prev) => ({ ...prev, [q.id]: { trendyol_ok: !!data.trendyol_ok, message: data.message ?? "" } }));
+    } finally {
+      setSending(null);
     }
   }
 
@@ -220,7 +240,17 @@ export default function SorularPage() {
                           rows={3}
                           className="w-full text-sm border border-gray-200 rounded-lg p-3 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 bg-gray-50"
                         />
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap items-center">
+                          {!q.is_answered && (
+                            <button
+                              onClick={() => sendAnswer(q)}
+                              disabled={sending === q.id || !answerText.trim()}
+                              className="flex items-center gap-1.5 text-xs bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-60"
+                            >
+                              {sending === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                              {sending === q.id ? "Gönderiliyor…" : "Trendyol'a Gönder"}
+                            </button>
+                          )}
                           <button
                             onClick={() => copyToClipboard(q.id, answerText)}
                             className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:border-orange-300 transition-colors"
@@ -228,18 +258,15 @@ export default function SorularPage() {
                             {copied === q.id ? (
                               <><CheckCircle className="w-3.5 h-3.5 text-green-500" /> Kopyalandı</>
                             ) : (
-                              <><Copy className="w-3.5 h-3.5" /> Kopyala (Trendyol&apos;a yapıştır)</>
+                              <><Copy className="w-3.5 h-3.5" /> Kopyala</>
                             )}
                           </button>
-                          {!q.is_answered && (
-                            <button
-                              onClick={() => markAnswered(q.id)}
-                              className="flex items-center gap-1.5 text-xs bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-colors"
-                            >
-                              <CheckCircle className="w-3.5 h-3.5" /> Cevaplandı Olarak İşaretle
-                            </button>
-                          )}
                         </div>
+                        {sendResult[q.id] && (
+                          <p className={`text-xs mt-1 ${sendResult[q.id].trendyol_ok ? "text-green-600" : "text-amber-600"}`}>
+                            {sendResult[q.id].message}
+                          </p>
+                        )}
                       </div>
                     )}
 
