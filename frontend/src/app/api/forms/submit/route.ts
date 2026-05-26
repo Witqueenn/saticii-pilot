@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { h } from "@/lib/html";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 function validateInput(slug: unknown, rating: unknown, comment: unknown, email: unknown, phone: unknown, product_ref: unknown) {
   if (typeof slug !== "string" || slug.length > 100) return "Geçersiz slug";
@@ -14,6 +15,9 @@ function validateInput(slug: unknown, rating: unknown, comment: unknown, email: 
 }
 
 export async function POST(req: NextRequest) {
+  const rateLimitError = await checkRateLimit(req, "forms-submit", 5, 60);
+  if (rateLimitError) return rateLimitError;
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!

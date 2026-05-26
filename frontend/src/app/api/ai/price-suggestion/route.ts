@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const rl = await checkRateLimit(req, "ai", 20, 3600, user.id);
+  if (rl) return rl;
 
   const { product_name, our_price, category, competitors } = await req.json();
   if (!product_name || !our_price || !Array.isArray(competitors) || competitors.length === 0) {

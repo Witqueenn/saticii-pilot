@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -78,6 +79,9 @@ export async function POST(req: NextRequest) {
   const auth = await getUser(req);
   if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { user, supabase } = auth;
+
+  const rl = await checkRateLimit(req, "ai", 20, 3600, user.id);
+  if (rl) return rl;
 
   const { review_id, product_name, rating, comment, sentiment } = await req.json();
   if (!comment || !product_name || rating == null) {

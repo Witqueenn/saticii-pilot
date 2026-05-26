@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export interface ReviewAnalysisResult {
   totalAnalyzed: number;
@@ -14,6 +15,9 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const rl = await checkRateLimit(req, "ai", 20, 3600, user.id);
+  if (rl) return rl;
 
   const { reviews } = await req.json() as {
     reviews: { rating: number; comment: string; product_name: string }[];
