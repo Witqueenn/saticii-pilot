@@ -2,19 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Mail, Download, Users, Send, Loader2, CheckCircle } from "lucide-react";
+import { Mail, Download, Users, Send, Loader2, CheckCircle, Zap } from "lucide-react";
 
 interface WaitlistEntry {
   id: string;
   email: string;
   created_at: string;
+  invited_at: string | null;
 }
 
 export default function WaitlistPage() {
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviting, setInviting] = useState<string | null>(null);
-  const [invited, setInvited] = useState<Set<string>>(new Set());
+  const [sendingAll, setSendingAll] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ sent: number; total: number } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -37,16 +39,38 @@ export default function WaitlistPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      setInvited((prev) => new Set(prev).add(email));
+      setEntries((prev) =>
+        prev.map((e) => e.email === email ? { ...e, invited_at: new Date().toISOString() } : e)
+      );
     } finally {
       setInviting(null);
     }
   }
 
+  async function sendAll() {
+    setSendingAll(true);
+    setBulkResult(null);
+    try {
+      const res = await fetch("/api/admin/waitlist-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bulk: true }),
+      });
+      const data = await res.json();
+      setBulkResult({ sent: data.sent ?? 0, total: data.total ?? 0 });
+      const now = new Date().toISOString();
+      setEntries((prev) =>
+        prev.map((e) => !e.invited_at ? { ...e, invited_at: now } : e)
+      );
+    } finally {
+      setSendingAll(false);
+    }
+  }
+
   function exportCSV() {
-    const header = "Email,Tarih";
+    const header = "Email,Katılım Tarihi,Davet Tarihi";
     const rows = entries.map((e) =>
-      `${e.email},${new Date(e.created_at).toLocaleDateString("tr-TR")}`
+      `${e.email},${new Date(e.created_at).toLocaleDateString("tr-TR")},${e.invited_at ? new Date(e.invited_at).toLocaleDateString("tr-TR") : ""}`
     );
     const csv = [header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -58,6 +82,9 @@ export default function WaitlistPage() {
     URL.revokeObjectURL(url);
   }
 
+  const uninvitedCount = entries.filter((e) => !e.invited_at).length;
+  const invitedCount = entries.filter((e) => !!e.invited_at).length;
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
@@ -65,41 +92,63 @@ export default function WaitlistPage() {
           <h2 className="text-2xl font-bold text-gray-900">Waitlist</h2>
           <p className="text-gray-500 mt-1">{entries.length} kişi listeye katıldı</p>
         </div>
-        {entries.length > 0 && (
-          <button
-            onClick={exportCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium"
-          >
-            <Download className="w-4 h-4" />
-            CSV İndir
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {entries.length > 0 && (
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+            >
+              <Download className="w-4 h-4" />
+              CSV İndir
+            </button>
+          )}
+          {uninvitedCount > 0 && (
+            <button
+              onClick={sendAll}
+              disabled={sendingAll}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-60 transition-colors"
+            >
+              {sendingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+              {sendingAll ? "Gönderiliyor…" : `Hepsine Gönder (${uninvitedCount})`}
+            </button>
+          )}
+        </div>
       </div>
 
+      {bulkResult && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
+          <CheckCircle className="w-4 h-4 flex-shrink-0" />
+          {bulkResult.total} kişiden {bulkResult.sent} tanesine davet gönderildi.
+        </div>
+      )}
+
       {/* Özet kart */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-3">
           <div className="bg-blue-50 text-blue-600 p-2.5 rounded-lg">
             <Users className="w-4 h-4" />
           </div>
           <div>
-            <p className="text-xs text-gray-500">Toplam Kayıt</p>
+            <p className="text-xs text-gray-500">Toplam</p>
             <p className="text-2xl font-bold text-gray-900">{loading ? "—" : entries.length}</p>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-3">
           <div className="bg-green-50 text-green-600 p-2.5 rounded-lg">
+            <CheckCircle className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-xs text-gray-500">Davet Edildi</p>
+            <p className="text-2xl font-bold text-gray-900">{loading ? "—" : invitedCount}</p>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-3">
+          <div className="bg-orange-50 text-orange-600 p-2.5 rounded-lg">
             <Mail className="w-4 h-4" />
           </div>
           <div>
-            <p className="text-xs text-gray-500">Bu Hafta</p>
-            <p className="text-2xl font-bold text-gray-900">
-              {loading ? "—" : entries.filter((e) => {
-                const weekAgo = new Date();
-                weekAgo.setDate(weekAgo.getDate() - 7);
-                return new Date(e.created_at) >= weekAgo;
-              }).length}
-            </p>
+            <p className="text-xs text-gray-500">Bekleyen</p>
+            <p className="text-2xl font-bold text-gray-900">{loading ? "—" : uninvitedCount}</p>
           </div>
         </div>
       </div>
@@ -135,9 +184,10 @@ export default function WaitlistPage() {
                 <span className="text-xs text-gray-400 flex-shrink-0">
                   {new Date(e.created_at).toLocaleDateString("tr-TR")}
                 </span>
-                {invited.has(e.email) ? (
+                {e.invited_at ? (
                   <span className="flex items-center gap-1 text-xs text-green-600 font-medium flex-shrink-0">
-                    <CheckCircle className="w-3.5 h-3.5" /> Gönderildi
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    {new Date(e.invited_at).toLocaleDateString("tr-TR")}
                   </span>
                 ) : (
                   <button

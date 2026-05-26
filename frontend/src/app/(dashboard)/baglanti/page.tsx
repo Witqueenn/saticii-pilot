@@ -224,8 +224,11 @@ export default function BaglantiPage() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ products: number; orders: number; reviews: number; questions: number; returns: number; errors: string[] } | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [isWelcome, setIsWelcome] = useState(false);
 
   useEffect(() => {
+    setIsWelcome(new URLSearchParams(window.location.search).get("welcome") === "1");
+
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -275,9 +278,11 @@ export default function BaglantiPage() {
     const supabase = createClient();
     const { data } = await supabase.from("marketplace_credentials").select("id, marketplace").eq("seller_id", userId);
     setConnected(data ?? []);
+    await supabase.from("sellers").update({ onboarding_done: true }).eq("id", userId);
     setSaving(null);
     setOpen(null);
     setValues((prev) => ({ ...prev, [platformId]: {} }));
+    if (isWelcome) window.location.href = "/genel";
   }
 
   async function handleDelete(platformId: string) {
@@ -342,6 +347,13 @@ export default function BaglantiPage() {
           {totalConnected > 0 ? `${totalConnected} platform bağlı` : "Henüz bağlı platform yok"}
         </p>
       </div>
+
+      {isWelcome && (
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-5 text-white">
+          <p className="font-bold text-lg mb-1">Hoş geldin! 🎉 Hesabın doğrulandı.</p>
+          <p className="text-orange-100 text-sm">Son adım: Trendyol API bilgilerini girerek mağazanı bağla. Ortalama 2 dakika sürer.</p>
+        </div>
+      )}
 
       <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm text-orange-800">
         API bilgilerin şifreli olarak saklanır ve yalnızca veri çekme amacıyla kullanılır. Sipariş işlemi yapılmaz.

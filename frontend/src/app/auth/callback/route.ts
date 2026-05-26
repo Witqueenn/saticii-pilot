@@ -40,6 +40,8 @@ export async function GET(request: Request) {
         is_active: true,
         onboarding_done: false,
       }, { onConflict: "id", ignoreDuplicates: true });
+
+      return NextResponse.redirect(`${origin}/baglanti?welcome=1`);
     }
   }
 
