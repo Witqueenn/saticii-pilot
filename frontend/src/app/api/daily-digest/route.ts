@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { Resend } from "resend";
+import { h } from "@/lib/html";
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
@@ -112,7 +113,7 @@ function buildEmail(
 
     <div style="padding:24px">
       <p style="margin:0 0 2px;font-size:12px;color:#9ca3af">${todayStr}</p>
-      <h1 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#111827">Günaydın, ${shopName}! ☀️</h1>
+      <h1 style="margin:0 0 4px;font-size:18px;font-weight:700;color:#111827">Günaydın, ${h(shopName)}! ☀️</h1>
       <p style="margin:0 0 20px;font-size:13px;color:#6b7280">Bugün ilgilenmen gereken konular:</p>
 
       <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px">

@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { Resend } from "resend";
+import { h } from "@/lib/html";
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
@@ -288,11 +289,11 @@ function buildEmail(r: SellerReport, dashboardUrl: string): string {
           (p) => `
       <div style="border-left:3px solid #f97316;padding:10px 12px;margin-bottom:8px;background:#fff7ed;border-radius:0 8px 8px 0">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-          <span style="font-size:12px;font-weight:600;color:#111827">${p.customerName} &nbsp;<span style="color:#f97316">${starBar(p.rating)}</span></span>
+          <span style="font-size:12px;font-weight:600;color:#111827">${h(p.customerName)} &nbsp;<span style="color:#f97316">${starBar(p.rating)}</span></span>
           <span style="font-size:11px;color:#9ca3af">${p.hoursAgo < 24 ? p.hoursAgo + " saat önce" : Math.floor(p.hoursAgo / 24) + " gün önce"}</span>
         </div>
-        <div style="font-size:12px;color:#374151;font-style:italic">"${p.comment.length > 100 ? p.comment.slice(0, 100) + "…" : p.comment}"</div>
-        <div style="font-size:11px;color:#6b7280;margin-top:4px">${p.productName}</div>
+        <div style="font-size:12px;color:#374151;font-style:italic">"${h(p.comment.length > 100 ? p.comment.slice(0, 100) + "…" : p.comment)}"</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px">${h(p.productName)}</div>
       </div>`
         )
         .join("")}
@@ -356,7 +357,7 @@ function buildEmail(r: SellerReport, dashboardUrl: string): string {
       <div style="margin-bottom:20px">
         <p style="margin:0 0 4px;font-size:13px;color:#6b7280">${range}</p>
         <h1 style="margin:0;font-size:20px;font-weight:700;color:#111827">
-          Merhaba ${r.shopName}! 👋
+          Merhaba ${h(r.shopName)}! 👋
         </h1>
         <p style="margin:6px 0 0;font-size:13px;color:#6b7280">Bu haftaki mağaza özetin hazır.</p>
       </div>
