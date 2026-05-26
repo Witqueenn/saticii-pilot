@@ -96,6 +96,8 @@ export default function DashboardScreen() {
   const [goalModalOpen, setGoalModalOpen] = useState(false);
   const [goalInputVal, setGoalInputVal] = useState("");
   const [savingGoal, setSavingGoal] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const { refresh: refreshBadges } = useBadges();
 
   useRealtimeReviews(sellerId, () => { load(); refreshBadges(); });
@@ -231,6 +233,33 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }
 
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/trendyol/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      });
+      const d = await res.json();
+      const parts: string[] = [];
+      if (d.reviews > 0)  parts.push(`${d.reviews} yorum`);
+      if (d.returns > 0)  parts.push(`${d.returns} iade`);
+      if (d.products > 0) parts.push(`${d.products} ürün`);
+      if (d.orders > 0)   parts.push(`${d.orders} sipariş`);
+      setSyncMsg(parts.length > 0 ? `Senkronize edildi: ${parts.join(", ")}` : "Yeni veri yok");
+      await load();
+      refreshBadges();
+    } catch {
+      setSyncMsg("Bağlantı hatası, tekrar dene");
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMsg(null), 4000);
+    }
+  }
+
   const initials = shopName.slice(0, 2).toUpperCase();
 
   if (loading) {
@@ -272,6 +301,13 @@ export default function DashboardScreen() {
           <TouchableOpacity style={[styles.searchBtn, { backgroundColor: t.input }]} onPress={() => { Haptics.selectionAsync(); setSearchOpen(true); }}>
             <Ionicons name="search" size={20} color={t.textSub} />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.searchBtn, { backgroundColor: t.input }]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleSync(); }}
+            disabled={syncing}
+          >
+            <Ionicons name={syncing ? "hourglass-outline" : "sync-outline"} size={20} color={syncing ? t.orange : t.textSub} />
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.avatar, { backgroundColor: t.orange }]} onPress={() => router.push("/(tabs)/ayarlar")}>
             <Text style={styles.avatarText}>{initials}</Text>
           </TouchableOpacity>
@@ -283,6 +319,14 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.orange} />}
       >
+        {/* Sync sonuç mesajı */}
+        {syncMsg && (
+          <View style={{ backgroundColor: "#f0fdf4", borderRadius: 10, padding: 12, marginBottom: 12, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+            <Text style={{ fontSize: 13, color: "#15803d", flex: 1 }}>{syncMsg}</Text>
+          </View>
+        )}
+
         {/* KPI Grid */}
         <View style={styles.kpiGrid}>
           {kpis.map((k) => (

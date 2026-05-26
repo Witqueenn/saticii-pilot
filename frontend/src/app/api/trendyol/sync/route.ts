@@ -554,12 +554,12 @@ export async function POST(req: NextRequest) {
 
 // ── Expo push notification ────────────────────────────────────────────────────
 
-async function sendPush(token: string, title: string, body: string) {
+async function sendPush(token: string, title: string, body: string, data: Record<string, string> = {}) {
   try {
     await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ to: token, title, body, sound: "default", badge: 1 }),
+      body: JSON.stringify({ to: token, title, body, sound: "default", badge: 1, data }),
       signal: AbortSignal.timeout(8_000),
     });
   } catch { /* push is best-effort */ }
@@ -596,7 +596,8 @@ async function maybePushAlerts(db: SupabaseClient, sellerId: string) {
   if ((urgentReviews ?? 0) > 0) parts.push(`${urgentReviews} acil yorum`);
   if ((pendingQuestions ?? 0) > 0) parts.push(`${pendingQuestions} yeni soru`);
 
-  await sendPush(seller.push_token, "SatıcıPilot — Aksiyon Gerekiyor", parts.join(", ") + " bekliyor");
+  const screen = (urgentReviews ?? 0) > 0 ? "reviews" : "questions";
+  await sendPush(seller.push_token, "SatıcıPilot — Aksiyon Gerekiyor", parts.join(", ") + " bekliyor", { screen });
 }
 
 // ── Cron handler (GET) ────────────────────────────────────────────────────────
